@@ -851,6 +851,454 @@ app.post("/generate", async (req, res) => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════
+// HTML GENERATOR
+// ═════════════════════════════════════════════════════════════════════════
+
+function buildHtml(data, meta) {
+  const patentNumber  = data.Patent_Number  || meta.Patent_Number  || "";
+  const title         = data.Title          || meta.Title          || "";
+  const owner         = data.Owner          || meta.Owner          || "";
+  const standard      = data.Standard       || meta.Standard       || "";
+  const claimNumber   = data.Claim_Number   || "";
+  const claimText     = data.Claim          || "";
+  const claimCategory = data.Claim_Category || "";
+  const pctMapped     = data.Mapped_Percentage || "";
+  const pctWeighted   = data["Mapped_Percentage_(Weighted)"] || "";
+  const essDecision   = data.Essentiality_Conclusion || "";
+  const opinion       = data.Summary        || "";
+  const mappingItems  = data.Mapping_Summary || [];
+  const charts        = data.Claim_Charts   || [];
+
+  function parseLimitationsH(str) {
+    const lines = (str || "").split("\n");
+    const label = lines[0].trim();
+    const body  = lines.slice(1).join("\n").replace(/^\s*\n/, "").trim();
+    return { label, body };
+  }
+  const { label: limLabel, body: limBody } = parseLimitationsH(data["Limitation(s)"] || "");
+  const claimLabel = `${claimNumber} \u2014 ${claimCategory} Claim`;
+
+  function esc(str) {
+    return String(str || "")
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function renderInline(str) {
+    return String(str || "")
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, "<em>$1</em>");
+  }
+
+  function renderMdTable(tableLines) {
+    let thead = "", tbody = "";
+    tableLines.forEach((line, idx) => {
+      if (/^\|[\s\-:|]+\|$/.test(line.trim())) return;
+      const cells = line.split("|").slice(1, -1);
+      if (idx === 0) {
+        thead = "<thead><tr>" + cells.map(c => `<th>${renderInline(c.trim())}</th>`).join("") + "</tr></thead>";
+      } else {
+        tbody += "<tr>" + cells.map(c => `<td>${renderInline(c.trim())}</td>`).join("") + "</tr>";
+      }
+    });
+    return `<table class="exc-table">${thead}<tbody>${tbody}</tbody></table>`;
+  }
+
+  function renderMdBlock(md) {
+    if (!md) return "";
+    const lines = md.split("\n");
+    let out = "", i = 0;
+    while (i < lines.length) {
+      const line = lines[i];
+      const trimmed = line.trim();
+      if (trimmed.startsWith("|")) {
+        const tableLines = [];
+        while (i < lines.length && lines[i].trim().startsWith("|")) { tableLines.push(lines[i]); i++; }
+        out += renderMdTable(tableLines); continue;
+      }
+      if (trimmed.startsWith("## ")) { out += `<p class="exc-subhead">${renderInline(trimmed.slice(3))}</p>`; i++; continue; }
+      if (trimmed.startsWith("# "))  { i++; continue; }
+      if (/^[\t\s]*[\u2014\u2013-]/.test(line) && trimmed.startsWith("\u2014")) {
+        out += '<ul class="exc-list">';
+        while (i < lines.length && lines[i].trim().startsWith("\u2014")) {
+          const text = lines[i].trim().replace(/^[\u2014]\s*/, "");
+          out += `<li>${renderInline(text)}</li>`; i++;
+        }
+        out += "</ul>"; continue;
+      }
+      if (/^ {2,}/.test(line) && trimmed !== "") { out += `<p class="exc-indent">${renderInline(trimmed)}</p>`; i++; continue; }
+      if (trimmed === "") { i++; continue; }
+      out += `<p>${renderInline(trimmed)}</p>`; i++;
+    }
+    return out;
+  }
+
+  function renderAnalysisBlock(str) {
+    if (!str) return "<p></p>";
+    return str.split(/\n\n+/).map(para => {
+      para = para.trim();
+      if (!para) return "";
+      const subLines = para.split("\n").filter(l => l.trim());
+      if (subLines.length > 1) return subLines.map(l => `<p>${renderInline(l.trim())}</p>`).join("");
+      return `<p>${renderInline(para)}</p>`;
+    }).join("");
+  }
+
+  function essClasses(decision) {
+    const d = (decision || "").toLowerCase();
+    if (d.includes("not essential"))  return { card: "", value: "red", dot: "dot-red", verdict: "red", badge: "badge-red" };
+    if (d.includes("conditional"))    return { card: "highlight", value: "amber", dot: "dot-amber", verdict: "amber", badge: "badge-amber" };
+    if (d.includes("essential"))      return { card: "highlight-green", value: "green", dot: "dot-green", verdict: "green", badge: "badge-green" };
+    return { card: "highlight", value: "amber", dot: "dot-amber", verdict: "amber", badge: "badge-amber" };
+  }
+
+  // Reuse the improved parseExcerpt but return bodyHtml instead of bodyLines
+  function parseExcerptHtml(excStr) {
+    const numMatch  = excStr.match(/\*\*Excerpt_Number:\*\*\s*([^\n\s]+)/);
+    const num       = numMatch ? numMatch[1] : "?";
+    const textMatch = excStr.match(/\*\*Excerpt_Text:\*\*\s*Excerpt:[ \t]*\n([\s\S]+)/);
+    const rawBody   = textMatch ? textMatch[1].replace(/\n---[ \t]*$/, "").trim() : excStr;
+    const refMatch  =
+      rawBody.match(/Reference:[ \t]*\n\*\*([^*\n]+)\*\*/) ||
+      rawBody.match(/Reference:[ \t]*\n([^\n*][^\n]+)/)     ||
+      rawBody.match(/Reference:[ \t]+([^\n]+)/);
+    const ref = refMatch ? refMatch[1].trim() : "";
+    const bodyStripped = rawBody
+      .replace(/\nReference:[ \t]*\n\*\*[^*]+\*\*[ \t]*/g, "")
+      .replace(/\nReference:[ \t]*\n[^\n]+[ \t]*/g, "")
+      .replace(/\nReference:[ \t]+[^\n]+/g, "")
+      .trim();
+    const h2Match = bodyStripped.match(/^##[ \t]+(.+)/m);
+    const heading = h2Match ? h2Match[1].trim() : "";
+    const bodyHtml = renderMdBlock(bodyStripped);
+    return { num, ref, heading, bodyHtml };
+  }
+
+  const ec = essClasses(essDecision);
+
+  function buildMappingSummaryHtml(items) {
+    return items.map(item => {
+      const bc = essClasses(item.Conclusions || "").badge;
+      const conclusions = item.Conclusions || "";
+      const badgeLabel = conclusions.includes("|") ? conclusions.split("|")[0].trim() : conclusions;
+      return `
+        <div class="mapping-item">
+          <div class="mapping-item-header">
+            <div class="feat-num">${esc(item.Index)}</div>
+            <div class="feat-text">${esc(item.Key_Feature)}</div>
+            <div><span class="badge ${bc}">${esc(badgeLabel)}</span></div>
+          </div>
+          <div class="mapping-item-body">
+            <p><strong>Conclusion:</strong> ${esc(conclusions)}</p>
+            <p><strong>Brief Rationale:</strong> ${esc(item.Brief_Rationale)}</p>
+          </div>
+        </div>`;
+    }).join("\n");
+  }
+
+  function buildClaimChartHtml(charts) {
+    return charts.map(chart => {
+      const feat  = chart.Claim_Feature || {};
+      const dec   = chart.Decision      || {};
+      const ana   = chart.Analysis      || {};
+      const excRaw = chart.Cited_Excerpts || [];
+      const disclosure = dec.Disclosure || "";
+      const essClass   = dec.Essentiality_Classification || "";
+      const justification = dec.Justification || "";
+      const fc = essClasses(essClass);
+      const parsedExcs = excRaw.map(parseExcerptHtml);
+      const excItemsHtml = parsedExcs.map(exc => `
+              <div class="excerpt-item">
+                <div class="excerpt-item-header">
+                  <span class="exc-num">Excerpt ${esc(exc.num)}</span>
+                  <span class="exc-ref">${esc(exc.ref)}</span>
+                </div>
+                <div class="excerpt-item-body">
+                  ${exc.heading ? `<h4>${esc(exc.heading)}</h4>` : ""}
+                  ${exc.bodyHtml}
+                </div>
+              </div>`).join("\n");
+      return `
+      <div class="claim-feature-block">
+        <div class="cfb-header">
+          <div class="feat-num">${esc(feat.Index)}</div>
+          <div class="feat-title">${esc(feat.Text)}</div>
+        </div>
+        <div class="cfb-verdict">
+          <div class="verdict-item"><div class="verdict-dot ${fc.dot}"></div><span class="${fc.verdict}">${esc(disclosure)}</span></div>
+          <span class="verdict-sep">&middot;</span>
+          <div class="verdict-item"><div class="verdict-dot ${fc.dot}"></div><span class="${fc.verdict}">${esc(essClass)}</span></div>
+        </div>
+        <div class="cfb-body">
+          <div class="cfb-col">
+            <h4>Analysis</h4>
+            <div class="sub-heading">Interpretation</div>${renderAnalysisBlock(ana.Interpretation)}
+            <div class="sub-heading">Mapping Summary</div>${renderAnalysisBlock(ana.Mapping_Summary)}
+            <div class="sub-heading">Differences</div>${renderAnalysisBlock(ana.Differences)}
+            <div class="sub-heading">Overall Opinion</div>${renderAnalysisBlock(ana.Overall_Opinion)}
+            <div class="justification-panel">
+              <div class="j-label">Essentiality Justification</div>
+              <p>${esc(justification)}</p>
+            </div>
+          </div>
+          <div class="cfb-col">
+            <h4>Cited Standard Excerpts</h4>
+            <div class="excerpts-section">
+              <button class="excerpt-toggle" onclick="toggleExcerpts(this)" aria-expanded="false">
+                <span class="toggle-left"><span>Standard Excerpts</span><span class="excerpt-count">${parsedExcs.length}</span></span>
+                <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <div class="excerpt-body">${excItemsHtml}</div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }).join("\n");
+  }
+
+  const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" height="36" viewBox="0 0 3144.8497854077254 1027.5281652360513"><g transform="scale(7.242489270386266) translate(10, 10)"><defs id="SvgjsDefs1027"/><g id="SvgjsG1028" featureKey="symbolGroupContainer" transform="matrix(1.16515289568328,0,0,1.16515289568328,0.000007264315552150539,0.000007264315552150539)" fill="#fff"><path d="M52.3 104.6a52.3 52.3 0 1 1 52.3-52.3 52.4 52.4 0 0 1-52.3 52.3zm0-102.3a50 50 0 1 0 50 50 50 50 0 0 0-50-50z"/></g><g id="SvgjsG1029" featureKey="2ou6gm-0" transform="matrix(0.9971509971509972,0,0,0.9971509971509972,264.8062678062678,-335.4786324786325)" fill="#fff"><path d="M-167.5,390.5c-1.1,0-2-0.9-2-2c0-1.1,0.9-2,2-2c1.1,0,2,0.9,2,2C-165.5,389.6-166.4,390.5-167.5,390.5z M-177.5,428.5c-2.2,0-4-1.8-4-4s1.8-4,4-4c2.2,0,4,1.8,4,4S-175.3,428.5-177.5,428.5z M-177.5,410.5c-2.2,0-4-1.8-4-4s1.8-4,4-4c2.2,0,4,1.8,4,4S-175.3,410.5-177.5,410.5z M-177.5,392.5c-2.2,0-4-1.8-4-4c0-2.2,1.8-4,4-4c2.2,0,4,1.8,4,4C-173.5,390.7-175.3,392.5-177.5,392.5z M-177.5,374.5c-2.2,0-4-1.8-4-4c0-2.2,1.8-4,4-4c2.2,0,4,1.8,4,4C-173.5,372.7-175.3,374.5-177.5,374.5z M-194.5,414.5c-3.9,0-7-3.1-7-7c0-3.9,3.1-7,7-7c3.9,0,7,3.1,7,7C-187.5,411.4-190.6,414.5-194.5,414.5z M-194.5,394.5c-3.9,0-7-3.1-7-7c0-3.9,3.1-7,7-7c3.9,0,7,3.1,7,7C-187.5,391.4-190.6,394.5-194.5,394.5z M-195.5,374.5c-2.2,0-4-1.8-4-4c0-2.2,1.8-4,4-4c2.2,0,4,1.8,4,4C-191.5,372.7-193.3,374.5-195.5,374.5z M-195.5,362.5c-1.1,0-2-0.9-2-2c0-1.1,0.9-2,2-2c1.1,0,2,0.9,2,2C-193.5,361.6-194.4,362.5-195.5,362.5z M-214.5,414.5c-3.9,0-7-3.1-7-7c0-3.9,3.1-7,7-7s7,3.1,7,7C-207.5,411.4-210.6,414.5-214.5,414.5z M-214.5,394.5c-3.9,0-7-3.1-7-7c0-3.9,3.1-7,7-7s7,3.1,7,7C-207.5,391.4-210.6,394.5-214.5,394.5z M-213.5,374.5c-2.2,0-4-1.8-4-4c0-2.2,1.8-4,4-4c2.2,0,4,1.8,4,4C-209.5,372.7-211.3,374.5-213.5,374.5z M-213.5,362.5c-1.1,0-2-0.9-2-2c0-1.1,0.9-2,2-2c1.1,0,2,0.9,2,2C-211.5,361.6-212.4,362.5-213.5,362.5z M-231.5,374.5c-2.2,0-4-1.8-4-4c0-2.2,1.8-4,4-4c2.2,0,4,1.8,4,4C-227.5,372.7-229.3,374.5-231.5,374.5z M-231.5,384.5c2.2,0,4,1.8,4,4c0,2.2-1.8,4-4,4c-2.2,0-4-1.8-4-4C-235.5,386.3-233.7,384.5-231.5,384.5z M-241.5,408.5c-1.1,0-2-0.9-2-2c0-1.1,0.9-2,2-2c1.1,0,2,0.9,2,2C-239.5,407.6-240.4,408.5-241.5,408.5z M-241.5,390.5c-1.1,0-2-0.9-2-2c0-1.1,0.9-2,2-2c1.1,0,2,0.9,2,2C-239.5,389.6-240.4,390.5-241.5,390.5z M-231.5,402.5c2.2,0,4,1.8,4,4s-1.8,4-4,4c-2.2,0-4-1.8-4-4S-233.7,402.5-231.5,402.5z M-231.5,420.5c2.2,0,4,1.8,4,4s-1.8,4-4,4c-2.2,0-4-1.8-4-4S-233.7,420.5-231.5,420.5z M-213.5,420.5c2.2,0,4,1.8,4,4c0,2.2-1.8,4-4,4c-2.2,0-4-1.8-4-4C-217.5,422.3-215.7,420.5-213.5,420.5z M-213.5,432.5c1.1,0,2,0.9,2,2c0,1.1-0.9,2-2,2c-1.1,0-2-0.9-2-2C-215.5,433.4-214.6,432.5-213.5,432.5z M-195.5,420.5c2.2,0,4,1.8,4,4c0,2.2-1.8,4-4,4c-2.2,0-4-1.8-4-4C-199.5,422.3-197.7,420.5-195.5,420.5z M-195.5,432.5c1.1,0,2,0.9,2,2c0,1.1-0.9,2-2,2c-1.1,0-2-0.9-2-2C-197.5,433.4-196.6,432.5-195.5,432.5z M-167.5,404.5c1.1,0,2,0.9,2,2c0,1.1-0.9,2-2,2c-1.1,0-2-0.9-2-2C-169.5,405.4-168.6,404.5-167.5,404.5z" style="fill-rule:evenodd;clip-rule:evenodd;"/></g><g id="SvgjsG1030" featureKey="kZnDdN-0" transform="matrix(3.8775259911441498,0,0,3.8775259911441498,137.1154802767278,2.6123700442792526)" fill="#fff"><path d="M2.8906 8.457 c-0.88867 0 -1.6309 -0.72266 -1.6309 -1.6211 c0 -0.88867 0.74219 -1.6113 1.6309 -1.6113 c0.86914 0 1.6113 0.72266 1.6113 1.6113 c0 0.89844 -0.74219 1.6211 -1.6113 1.6211 z M1.4551 20 l0 -10.039 l2.832 0 l0 10.039 l-2.832 0 z M13.0859875 9.766 c2.6465 0 4.834 1.9434 4.834 5.2344 s-2.1875 5.2344 -4.834 5.2344 c-1.3086 0 -2.4805 -0.50781 -3.0762 -1.4258 l0 6.0742 l-2.8125 0 l0 -14.922 l2.666 0 l0.078125 1.3477 c0.55664 -0.99609 1.7773 -1.543 3.1445 -1.543 z M12.4511875 17.9004 c1.4746 0 2.6563 -1.0742 2.6563 -2.9004 s-1.1816 -2.9004 -2.6563 -2.9004 c-1.5039 0 -2.6758 1.1426 -2.6758 2.9004 s1.1719 2.9004 2.6758 2.9004 z M37.129296875 9.766 c2.1484 0 3.5352 1.0938 3.5352 3.1543 l0 7.0801 l-2.8125 0 l0 -6.2793 c0 -1.1816 -0.74219 -1.6992 -1.582 -1.6992 c-1.0059 0 -1.8945 0.57617 -1.8945 2.3145 l0 5.6641 l-2.8418 0 l0 -6.25 c0 -1.2012 -0.72266 -1.7285 -1.6113 -1.7285 c-0.97656 0 -1.8848 0.57617 -1.8848 2.4609 l0 5.5176 l-2.8027 0 l0 -10.039 l2.8027 0 l0 1.1816 c0.66406 -0.83008 1.7871 -1.3086 3.1152 -1.3086 z M44.833959375 8.457 c-0.88867 0 -1.6309 -0.72266 -1.6309 -1.6211 c0 -0.88867 0.74219 -1.6113 1.6309 -1.6113 c0.86914 0 1.6113 0.72266 1.6113 1.6113 c0 0.89844 -0.74219 1.6211 -1.6113 1.6211 z M43.398459375 20 l0 -10.039 l2.832 0 l0 10.039 l-2.832 0 z M55.068346875 9.766 c2.4121 0 3.7402 1.25 3.7402 3.4766 l0 6.7578 l-2.8223 0 l0 -6.1523 c0 -1.3379 -0.83008 -1.8262 -1.7969 -1.8262 c-1.1621 0 -2.2168 0.58594 -2.2363 2.4414 l0 5.5371 l-2.8125 0 l0 -10.039 l2.8125 0 l0 1.1133 c0.70313 -0.83008 1.7871 -1.3086 3.1152 -1.3086 z M68.652325 5 l2.8125 0 l0 15 l-2.666 0 l-0.068359 -1.3086 c-0.57617 0.98633 -1.7871 1.543 -3.1543 1.543 c-2.6465 0 -4.834 -1.9531 -4.834 -5.2344 s2.1973 -5.2344 4.834 -5.2344 c1.3184 0 2.4805 0.49805 3.0762 1.4063 l0 -6.1719 z M66.220725 17.9004 c1.4941 0 2.6563 -1.1426 2.6563 -2.9004 s-1.1719 -2.9102 -2.6563 -2.9102 c-1.4941 0 -2.666 1.1035 -2.666 2.9102 c0 1.7969 1.1719 2.9004 2.666 2.9004 z"/></g></g></svg>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>${esc(patentNumber)} \u2013 Patent Analysis Report</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Source+Sans+3:wght@300;400;500;600&family=Source+Code+Pro:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root{--brand:#ff6734;--brand-light:#fff0eb;--navy:#0f1f38;--ink:#1c1c2e;--mid:#4a4a6a;--muted:#7a7a96;--rule:#e2e2ed;--bg:#fafaf8;--surface:#ffffff;--surface-alt:#f4f4f0;--green:#1a6b4a;--green-bg:#eaf5ef;--amber:#8a5a00;--amber-bg:#fdf5e0;--red:#8a0000;--red-bg:#fdf0f0;--radius:6px;--radius-lg:12px;}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    html{scroll-behavior:smooth;}
+    body{font-family:'Source Sans 3',sans-serif;font-size:15px;line-height:1.7;color:var(--ink);background:var(--bg);}
+    @page{margin:2cm;}
+    @media print{.excerpt-toggle{display:none;}.excerpt-body{display:block!important;}}
+    .page-wrap{max-width:1040px;margin:0 auto;padding:0 32px 80px;}
+    .brand-rule{height:4px;background:var(--brand);}
+    .header-bar{background:var(--navy);}
+    .header-bar-inner{max-width:1040px;margin:0 auto;padding:28px 32px;display:flex;justify-content:space-between;align-items:center;}
+    .header-bar .logo svg{height:32px;width:auto;}
+    .header-bar .confidential{font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.2);padding:4px 12px;border-radius:2px;}
+    .identity{padding:48px 0 40px;border-bottom:1px solid var(--rule);}
+    .identity-meta{display:flex;gap:8px;align-items:center;margin-bottom:16px;}
+    .pill{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;padding:3px 10px;border-radius:2px;background:var(--brand-light);color:var(--brand);}
+    .pill-navy{background:rgba(15,31,56,.08);color:var(--navy);}
+    .identity h1{font-family:'Playfair Display',serif;font-size:32px;font-weight:600;color:var(--navy);line-height:1.2;margin-bottom:8px;}
+    .identity-grid{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--rule);border-radius:var(--radius);overflow:hidden;margin-top:32px;}
+    .identity-cell{padding:16px 20px;border-right:1px solid var(--rule);}
+    .identity-cell:last-child{border-right:none;}
+    .identity-cell .label{font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+    .identity-cell .value{font-size:14px;font-weight:600;color:var(--navy);}
+    .claim-block{margin:36px 0 0;border-left:3px solid var(--brand);background:var(--surface);padding:20px 24px;border-radius:0 var(--radius) var(--radius) 0;}
+    .claim-block .claim-label{font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--brand);margin-bottom:10px;}
+    .claim-block p{font-size:14px;line-height:1.75;color:var(--ink);font-style:italic;}
+    .section{margin-top:56px;}
+    .section-heading{display:flex;align-items:center;gap:16px;margin-bottom:28px;}
+    .section-heading h2{font-family:'Playfair Display',serif;font-size:22px;font-weight:600;color:var(--navy);white-space:nowrap;}
+    .section-heading::after{content:'';flex:1;height:1px;background:var(--rule);}
+    .summary-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px;}
+    .summary-cards.two-col{grid-template-columns:1fr 3fr;}
+    .summary-card{background:var(--surface);border:1px solid var(--rule);border-radius:var(--radius);padding:18px 20px;}
+    .summary-card.highlight{background:var(--amber-bg);border-color:#e8c96a;}
+    .summary-card.highlight-green{background:var(--green-bg);border-color:#a0d4b8;}
+    .summary-card .sc-label{font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+    .summary-card .sc-value{font-size:22px;font-weight:700;color:var(--navy);line-height:1.1;}
+    .summary-card .sc-value.amber{font-size:15px;color:var(--amber);}
+    .summary-card .sc-value.green{font-size:15px;color:var(--green);}
+    .summary-card .sc-value.red{font-size:15px;color:var(--red);}
+    .summary-card .sc-value.meta{font-size:14px;font-weight:500;color:var(--mid);}
+    .opinion-box{background:var(--surface);border:1px solid var(--rule);border-radius:var(--radius-lg);padding:28px 32px;}
+    .opinion-box h3{font-family:'Playfair Display',serif;font-size:16px;font-weight:600;color:var(--navy);margin-bottom:12px;}
+    .opinion-box p{font-size:14px;line-height:1.8;color:var(--mid);}
+    .limitations-box{background:var(--surface-alt);border:1px solid var(--rule);border-radius:var(--radius);padding:20px 24px;margin-top:16px;}
+    .limitations-box .lim-label{font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+    .limitations-box p{font-size:14px;line-height:1.8;color:var(--mid);}
+    .mapping-list{display:flex;flex-direction:column;gap:16px;margin-top:8px;}
+    .mapping-item{background:var(--surface);border:1px solid var(--rule);border-radius:var(--radius);overflow:hidden;}
+    .mapping-item-header{display:flex;align-items:flex-start;gap:16px;padding:16px 20px;}
+    .feat-num{flex-shrink:0;width:26px;height:26px;border-radius:50%;background:var(--navy);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:2px;}
+    .mapping-item-header .feat-text{flex:1;font-size:14px;font-weight:600;color:var(--ink);line-height:1.5;}
+    .badge{flex-shrink:0;display:inline-block;font-size:11px;font-weight:600;padding:3px 10px;border-radius:2px;}
+    .badge-amber{background:var(--amber-bg);color:var(--amber);}
+    .badge-green{background:var(--green-bg);color:var(--green);}
+    .badge-red{background:var(--red-bg);color:var(--red);}
+    .mapping-item-body{border-top:1px solid var(--rule);padding:14px 20px 14px 62px;background:var(--surface-alt);}
+    .mapping-item-body p{font-size:13.5px;line-height:1.75;color:var(--mid);margin-bottom:8px;}
+    .mapping-item-body p:last-child{margin-bottom:0;}
+    .claim-feature-block{background:var(--surface);border:1px solid var(--rule);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:32px;}
+    .cfb-header{background:var(--navy);padding:20px 28px;display:flex;align-items:flex-start;gap:16px;}
+    .cfb-header .feat-num{background:var(--brand);font-size:13px;width:28px;height:28px;flex-shrink:0;margin-top:1px;}
+    .cfb-header .feat-title{font-size:14px;font-weight:500;color:rgba(255,255,255,.9);line-height:1.55;flex:1;font-style:italic;}
+    .cfb-verdict{display:flex;gap:10px;padding:16px 28px;background:var(--surface-alt);border-bottom:1px solid var(--rule);}
+    .verdict-item{display:flex;align-items:center;gap:8px;}
+    .verdict-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+    .dot-amber{background:#d4a00a;}.dot-green{background:#1a6b4a;}.dot-red{background:#8a0000;}
+    .verdict-item span{font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;}
+    .verdict-item span.amber{color:var(--amber);}.verdict-item span.green{color:var(--green);}.verdict-item span.red{color:var(--red);}
+    .verdict-sep{color:var(--rule);margin:0 4px;}
+    .cfb-body{display:grid;grid-template-columns:1fr 1fr;}
+    .cfb-col{padding:24px 28px;border-right:1px solid var(--rule);}
+    .cfb-col:last-child{border-right:none;}
+    .cfb-col h4{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--rule);}
+    .cfb-col p{font-size:13.5px;line-height:1.75;color:var(--mid);margin-bottom:10px;}
+    .cfb-col p:last-child{margin-bottom:0;}
+    .sub-heading{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--navy);margin:18px 0 8px;}
+    .sub-heading:first-of-type{margin-top:0;}
+    .justification-panel{margin:20px 0 0;background:var(--surface);border:1px solid var(--rule);border-left:3px solid var(--brand);border-radius:0 var(--radius) var(--radius) 0;padding:18px 22px;}
+    .justification-panel .j-label{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--brand);margin-bottom:8px;}
+    .justification-panel p{font-size:13.5px;line-height:1.75;color:var(--mid);}
+    .excerpt-toggle{width:100%;background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:14px 0;color:var(--navy);font-family:'Source Sans 3',sans-serif;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;transition:color .15s;}
+    .excerpt-toggle:hover{color:var(--brand);}
+    .excerpt-toggle .toggle-left{display:flex;align-items:center;gap:10px;}
+    .excerpt-count{background:var(--navy);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;}
+    .chevron{width:16px;height:16px;transition:transform .2s;color:var(--muted);}
+    .chevron.open{transform:rotate(180deg);}
+    .excerpt-body{display:none;}.excerpt-body.open{display:block;}
+    .excerpt-item{margin-top:16px;border:1px solid var(--rule);border-radius:var(--radius);overflow:hidden;}
+    .excerpt-item-header{background:var(--surface-alt);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--rule);}
+    .exc-num{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--navy);}
+    .exc-ref{font-size:11px;color:var(--muted);font-family:'Source Code Pro',monospace;}
+    .excerpt-item-body{padding:14px 16px;background:#fafafa;font-family:'Source Code Pro',monospace;font-size:12px;line-height:1.65;color:var(--mid);overflow-x:auto;}
+    .excerpt-item-body h4{font-family:'Source Sans 3',sans-serif;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--navy);margin-bottom:10px;}
+    .excerpt-item-body p{margin-bottom:6px;}.excerpt-item-body p:last-child{margin-bottom:0;}
+    .exc-subhead{font-weight:600;color:var(--navy);margin-top:10px!important;}
+    .exc-indent{padding-left:20px;}
+    .exc-list{padding-left:18px;margin:6px 0;}.exc-list li{margin-bottom:4px;}
+    .exc-table{width:100%;border-collapse:collapse;font-size:11px;margin:8px 0;}
+    .exc-table th,.exc-table td{border:1px solid var(--rule);padding:5px 8px;text-align:left;vertical-align:top;}
+    .exc-table th{background:var(--surface-alt);font-weight:600;color:var(--navy);}
+    .disclaimer{margin-top:64px;border:1px solid var(--rule);border-radius:var(--radius-lg);overflow:hidden;}
+    .disclaimer-header{background:var(--surface-alt);padding:16px 24px;border-bottom:1px solid var(--rule);display:flex;align-items:center;gap:10px;}
+    .disclaimer-icon{width:16px;height:16px;color:var(--muted);}
+    .disclaimer-header h4{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
+    .disclaimer-body{padding:20px 24px;}
+    .disclaimer-body ol{padding-left:18px;display:flex;flex-direction:column;gap:10px;}
+    .disclaimer-body li{font-size:12.5px;line-height:1.7;color:var(--muted);}
+    .disclaimer-body li strong{font-weight:600;color:var(--mid);}
+    .site-footer{text-align:center;padding:32px 0 0;font-size:12px;color:var(--muted);letter-spacing:.08em;}
+    @media(max-width:760px){.page-wrap{padding:0 16px 60px;}.summary-cards{grid-template-columns:1fr 1fr;}.summary-cards.two-col{grid-template-columns:1fr;}.identity-grid{grid-template-columns:1fr;}.identity-cell{border-right:none;border-bottom:1px solid var(--rule);}.cfb-body{grid-template-columns:1fr;}.cfb-col{border-right:none;border-bottom:1px solid var(--rule);}}
+  </style>
+</head>
+<body>
+  <div class="brand-rule"></div>
+  <div class="header-bar">
+    <div class="header-bar-inner">
+      <div class="logo">${LOGO_SVG}</div>
+      <div class="confidential">Confidential</div>
+    </div>
+  </div>
+  <div class="page-wrap">
+    <div class="identity">
+      <div class="identity-meta">
+        <span class="pill">${esc(patentNumber)}</span>
+        <span class="pill pill-navy">${esc(standard)}</span>
+        <span class="pill pill-navy">${esc(claimNumber)} &middot; ${esc(claimCategory)}</span>
+      </div>
+      <h1>${esc(title)}</h1>
+      <div class="identity-grid">
+        <div class="identity-cell"><div class="label">Patent Number</div><div class="value">${esc(patentNumber)}</div></div>
+        <div class="identity-cell"><div class="label">Owner</div><div class="value">${esc(owner)}</div></div>
+        <div class="identity-cell"><div class="label">Standard</div><div class="value">${esc(standard)}</div></div>
+      </div>
+      <div class="claim-block">
+        <div class="claim-label">${esc(claimLabel)}</div>
+        <p>${esc(claimText)}</p>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-heading"><h2>Executive Summary</h2></div>
+      <div class="summary-cards">
+        <div class="summary-card"><div class="sc-label">Claim Number</div><div class="sc-value">${esc(claimNumber)}</div></div>
+        <div class="summary-card"><div class="sc-label">Claim Category</div><div class="sc-value">${esc(claimCategory)}</div></div>
+        <div class="summary-card"><div class="sc-label">Percentage Mapped</div><div class="sc-value">${esc(pctMapped)}</div></div>
+        <div class="summary-card ${ec.card}"><div class="sc-label">Essentiality Decision</div><div class="sc-value ${ec.value}">${esc(essDecision)}</div></div>
+      </div>
+      <div class="summary-cards two-col">
+        <div class="summary-card"><div class="sc-label">Weighted Mapping</div><div class="sc-value">${esc(pctWeighted)}</div></div>
+        <div class="summary-card"><div class="sc-label">Limitations</div><div class="sc-value meta">${esc(limLabel)}</div></div>
+      </div>
+      <div class="opinion-box">
+        <h3>Opinion</h3>
+        <p>${esc(opinion)}</p>
+        <div class="limitations-box">
+          <div class="lim-label">Limitations Detail</div>
+          <p>${esc(limBody)}</p>
+        </div>
+      </div>
+      <div style="margin-top:32px;">
+        <div class="section-heading" style="margin-top:0;"><h2>Mapping Summary</h2></div>
+        <div class="mapping-list">${buildMappingSummaryHtml(mappingItems)}</div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-heading"><h2>Claim Chart</h2></div>
+      ${buildClaimChartHtml(charts)}
+    </div>
+    <div class="disclaimer">
+      <div class="disclaimer-header">
+        <svg class="disclaimer-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <h4>Disclaimer</h4>
+      </div>
+      <div class="disclaimer-body">
+        <ol>
+          <li><strong>Preliminary and Informational Nature:</strong> The present work product was generated using a prototype AI model and is provided for informational purposes only. It does not constitute a legal or technical opinion regarding the essentiality or non-essentiality of any patent claim to any technical standard. It is not a substitute for legal or technical advice, and clients are strongly encouraged to seek independent professional counsel before relying on this material for purposes such as licensing, enforcement, or infringement analysis.</li>
+          <li><strong>Scope of Analysis:</strong> The analysis is limited to the individual patent claim(s) identified in the chart and does not take into account the full patent specification, including the description and drawings. Consequently, any interpretation of claim scope is based on the claim language alone and may differ from that reached through a full legal construction under applicable law.</li>
+          <li><strong>Referencing of Standards:</strong> Where citations to section numbers, table numbers, or figure numbers in a technical standard are provided, they are included for convenience only. While care is taken in referencing, these citations should not be relied upon as authoritative without verification against the official version of the standard.</li>
+          <li><strong>Interpretation of Standards:</strong> References to technical standards are based on publicly available documents. Where relevant, excerpts are cited in text form. Figures and diagrams from such standards are not reproduced; instead, any associated visual content is paraphrased using descriptive language. Such paraphrasing should not be construed as a verbatim or authoritative interpretation of the standard itself.</li>
+          <li><strong>Subjectivity of Essentiality:</strong> Determinations of potential alignment between a patent claim and a standard may depend on how specific terms or functional steps are construed. What may appear to correspond closely under one interpretation may be viewed as merely analogous under another. This assessment is inherently interpretive and does not reflect a consensus view or judicial determination.</li>
+          <li><strong>Implementation Considerations:</strong> The presence of a feature in a standard does not imply that all compliant implementations necessarily use that feature. A compliant product may omit or bypass specific technical elements referenced in a patent claim.</li>
+          <li><strong>Alternative Solutions:</strong> Standards may include multiple options or alternative techniques to achieve similar functionality. A given patent claim may correspond to one such option, but not to others that are also compliant with the standard.</li>
+          <li><strong>Legal Proceedings:</strong> In the context of litigation, essentiality determinations typically require a far more detailed analysis, including expert testimony, claim construction under applicable law, and examination of implementation evidence. The present assessment should not be relied upon for litigation, licensing negotiation, or investment decisions without further professional review.</li>
+        </ol>
+      </div>
+    </div>
+    <div class="site-footer">ipmind.ai</div>
+  </div>
+  <script>
+    function toggleExcerpts(btn) {
+      const body = btn.nextElementSibling;
+      const chevron = btn.querySelector('.chevron');
+      const isOpen = body.classList.contains('open');
+      body.classList.toggle('open', !isOpen);
+      chevron.classList.toggle('open', !isOpen);
+      btn.setAttribute('aria-expanded', String(!isOpen));
+    }
+  </script>
+</body>
+</html>`;
+}
+
+// HTML endpoint — POST the IPMIND analysis JSON, returns HTML string in JSON
+app.post("/generate-html", (req, res) => {
+  try {
+    const body = req.body;
+    const data = Array.isArray(body) ? body[0] : body;
+    const meta = {
+      Patent_Number: req.query.patent   || "",
+      Title:         req.query.title    || "",
+      Owner:         req.query.owner    || "",
+      Standard:      req.query.standard || "",
+    };
+    const html = buildHtml(data, meta);
+    const safeName = (data.Patent_Number || meta.Patent_Number || "report")
+      .replace(/[^A-Za-z0-9_-]/g, "_");
+    res.json({
+      html,
+      filename: safeName + "_report.html",
+      patent:   data.Patent_Number || meta.Patent_Number || "",
+      claim:    data.Claim_Number  || "",
+      features: (data.Claim_Charts || []).length,
+      excerpts_total: (data.Claim_Charts || []).reduce((s, c) => s + (c.Cited_Excerpts || []).length, 0),
+    });
+  } catch (err) {
+    console.error("Error generating html:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════════════════
 // START
 // ═════════════════════════════════════════════════════════════════════════
 
