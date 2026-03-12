@@ -1,0 +1,43 @@
+# ═══════════════════════════════════════════════════════════════
+# IPMIND Docx Service — Azure App Service deployment
+# ---------------------------------------------------------------
+# Triggers on every push to main.
+# Requires one GitHub secret:
+#   AZURE_WEBAPP_PUBLISH_PROFILE
+# See README for how to obtain it.
+# ═══════════════════════════════════════════════════════════════
+
+name: Deploy to Azure App Service
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:   # also allows manual trigger from GitHub UI
+
+env:
+  AZURE_WEBAPP_NAME: ipmind-docx-service   # ← change to your App Service name
+  NODE_VERSION: '20.x'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --omit=dev
+
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: .

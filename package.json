@@ -1,0 +1,16 @@
+{
+  "name": "ipmind-docx-service",
+  "version": "1.0.0",
+  "description": "IPMIND patent report Word document generator microservice",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "docx": "^8.5.0",
+    "express": "^4.18.2"
+  }
+}
