@@ -4,7 +4,7 @@ const {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
   ImageRun, Header, Footer, AlignmentType, BorderStyle,
   WidthType, ShadingType, VerticalAlign, PageNumber,
-  TabStopType, TabStopPosition, PageOrientation, SectionType
+  TabStopType, TabStopPosition, PageBreak, PageOrientation, SectionType
 } = require("docx");
 
 const app  = express();
