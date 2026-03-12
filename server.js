@@ -621,10 +621,6 @@ const RESTRICTED_NOTICE_TEXT =
 function restrictedNoticePage() {
   return [
     new Paragraph({
-      children: [new PageBreak()],
-      spacing: { after: 0 },
-    }),
-    new Paragraph({
       children: [new TextRun({ text: "RESTRICTED USE NOTICE", font: "Arial",
         size: 17, bold: true, color: C.orange, characterSpacing: 80 })],
       spacing: { before: 480, after: 240 },
@@ -660,10 +656,7 @@ function restrictedNoticePage() {
         ],
       })],
     }),
-    new Paragraph({
-      children: [new PageBreak()],
-      spacing: { after: 0 },
-    }),
+    emptyPara(),
   ];
 }
 
@@ -695,8 +688,6 @@ async function buildDocument(data, meta, restricted) {
           color: C.navy, characterSpacing: 40 }),
         new TextRun({ text: claimNumber + " \u00B7 " + claimCategory,
           font: "Arial", size: 17, bold: true, color: C.navy, characterSpacing: 40 }),
-        ...(restricted ? [new TextRun({ text: "   \u2014   CONFIDENTIAL \u00B7 RESTRICTED USE  \u2014  See page 2",
-          font: "Arial", size: 15, color: C.amberText, characterSpacing: 20 })] : []),
       ],
       spacing: { before: 320, after: 120 },
     }),
@@ -733,7 +724,6 @@ async function buildDocument(data, meta, restricted) {
     emptyPara(),
     claimBlock(claimLabel, claimText),
     emptyPara(),
-    ...(restricted ? restrictedNoticePage() : []),
     ...sectionHeading("Executive Summary"),
     summaryCardTable([
       { label: "Claim Number",         value: claimNumber },
@@ -826,7 +816,11 @@ async function buildDocument(data, meta, restricted) {
   ];
 
   // ── Section 3: Portrait — Disclaimer ──────────────────────────────────
-  const section3Children = [...disclaimerSection(), emptyPara()];
+  const section3Children = [
+    ...(restricted ? restrictedNoticePage() : []),
+    ...disclaimerSection(),
+    emptyPara(),
+  ];
 
   const doc = new Document({
     sections: [
