@@ -722,6 +722,28 @@ async function buildDocument(data, meta, restricted) {
       })],
     }),
     emptyPara(),
+    ...(restricted ? [new Table({
+      width: { size: PG.W, type: WidthType.DXA },
+      columnWidths: [PG.W],
+      borders: noBorders,
+      rows: [new TableRow({
+        children: [new TableCell({
+          borders: noBorders,
+          shading: shade(C.amberBg),
+          margins: { top: 80, bottom: 80, left: 160, right: 160 },
+          width: { size: PG.W, type: WidthType.DXA },
+          children: [new Paragraph({
+            children: [
+              new TextRun({ text: "\u26A0\uFE0F  RESTRICTED USE", font: "Arial",
+                size: 16, bold: true, color: C.amberText, characterSpacing: 60 }),
+              new TextRun({ text: "   \u00B7   This report is subject to restricted use. See notice at end of document.",
+                font: "Arial", size: 16, color: C.amberText }),
+            ],
+            spacing: { after: 0 },
+          })],
+        })],
+      })],
+    }), emptyPara()] : []),
     claimBlock(claimLabel, claimText),
     emptyPara(),
     ...sectionHeading("Executive Summary"),
