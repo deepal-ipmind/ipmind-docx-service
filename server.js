@@ -531,20 +531,43 @@ function disclaimerSection() {
 
 // ── Parse excerpt markdown string ─────────────────────────────────────────
 function parseExcerpt(excStr) {
-  const numMatch  = excStr.match(/\*\*Excerpt_Number:\*\*\s*(\S+)/);
-  const num       = numMatch ? numMatch[1] : "?";
-  const textMatch = excStr.match(/\*\*Excerpt_Text:\*\*\s*Excerpt:\s*\n([\s\S]+?)(?:\n---\s*$|$)/);
-  const rawBody   = textMatch ? textMatch[1].trim() : excStr;
-  const refMatch  = rawBody.match(/Reference:\s*\n\*\*([^*]+)\*\*/);
-  const ref       = refMatch ? refMatch[1].trim() : "";
-  const bodyStripped = rawBody.replace(/\nReference:\s*\n\*\*[^*]+\*\*\s*/g, "").trim();
-  const h2Match   = bodyStripped.match(/^##\s+(.+)/m);
-  const heading   = h2Match ? h2Match[1].trim() : "";
-  // Split body into lines for the docx excerpt renderer
+  // Excerpt number — handle "1", "1.", "1  " etc.
+  const numMatch = excStr.match(/\*\*Excerpt_Number:\*\*\s*([^\n\s]+)/);
+  const num      = numMatch ? numMatch[1].replace(/\.$/, "") : "?";
+
+  // Extract body after "Excerpt_Text:** Excerpt:" — grab everything to end, strip trailing ---
+  const textMatch = excStr.match(/\*\*Excerpt_Text:\*\*\s*Excerpt:[ \t]*\n([\s\S]+)/);
+  const rawBody   = textMatch
+    ? textMatch[1].replace(/\n---[ \t]*$/, "").trim()
+    : excStr;
+
+  // Reference: match both **bold** and plain formats, across one or two lines
+  // Pattern 1: Reference:\n**text**
+  // Pattern 2: Reference:\nplain text
+  // Pattern 3: Reference: plain text (inline)
+  const refMatch =
+    rawBody.match(/Reference:[ \t]*\n\*\*([^*\n]+)\*\*/) ||
+    rawBody.match(/Reference:[ \t]*\n([^\n*][^\n]+)/)     ||
+    rawBody.match(/Reference:[ \t]+([^\n]+)/);
+  const ref = refMatch ? refMatch[1].trim() : "";
+
+  // Strip the reference block from body
+  const bodyStripped = rawBody
+    .replace(/\nReference:[ \t]*\n\*\*[^*]+\*\*[ \t]*/g, "")
+    .replace(/\nReference:[ \t]*\n[^\n]+[ \t]*/g, "")
+    .replace(/\nReference:[ \t]+[^\n]+/g, "")
+    .trim();
+
+  // Section heading from ## line
+  const h2Match = bodyStripped.match(/^##[ \t]+(.+)/m);
+  const heading = h2Match ? h2Match[1].trim() : "";
+
+  // Split into lines, skip top-level # headings and blank lines
   const bodyLines = bodyStripped
     .split("\n")
     .filter(l => !l.trim().startsWith("# ") && l.trim() !== "")
     .map(l => l.trim());
+
   return { num, ref, heading, bodyLines };
 }
 
