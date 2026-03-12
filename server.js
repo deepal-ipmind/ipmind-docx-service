@@ -605,7 +605,69 @@ function parseLimitations(str) {
 // DOCUMENT BUILDER
 // ═════════════════════════════════════════════════════════════════════════
 
-async function buildDocument(data, meta) {
+// ── Restricted Use Notice — Word page ─────────────────────────────────────
+const RESTRICTED_NOTICE_TEXT =
+  "This report is confidential and provided solely for internal use in connection " +
+  "with patent licensing, portfolio evaluation, or standards-related strategy. It must " +
+  "not be published, posted, or circulated to any third party without IP Mind\u2019s prior " +
+  "written consent. Where disclosure to a counterparty is necessary, the report may be " +
+  "shared in full or in part provided the counterparty is bound by a written " +
+  "confidentiality undertaking that places equivalent restrictions on use and further " +
+  "distribution, and that requires attribution of IP Mind\u2019s authorship to be retained. " +
+  "The recipient must not use this report to replicate, benchmark, or train models " +
+  "intended to reproduce IP Mind\u2019s methodology or outputs, or to develop competing " +
+  "analysis products or services.";
+
+function restrictedNoticePage() {
+  return [
+    new Paragraph({
+      children: [new PageBreak()],
+      spacing: { after: 0 },
+    }),
+    new Paragraph({
+      children: [new TextRun({ text: "RESTRICTED USE NOTICE", font: "Arial",
+        size: 17, bold: true, color: C.orange, characterSpacing: 80 })],
+      spacing: { before: 480, after: 240 },
+      border: { bottom: solidBorder(C.orange, 8) },
+    }),
+    new Table({
+      width: { size: PG.W, type: WidthType.DXA },
+      columnWidths: [60, PG.W - 60],
+      borders: noBorders,
+      rows: [new TableRow({
+        children: [
+          new TableCell({
+            borders: { top: noBorder, bottom: noBorder,
+              left: solidBorder(C.orange, 12), right: noBorder },
+            shading: shade(C.amberBg),
+            margins: { top: 0, bottom: 0, left: 0, right: 0 },
+            width: { size: 60, type: WidthType.DXA },
+            children: [emptyPara()],
+          }),
+          new TableCell({
+            borders: noBorders,
+            shading: shade(C.amberBg),
+            margins: { top: 200, bottom: 200, left: 240, right: 240 },
+            width: { size: PG.W - 60, type: WidthType.DXA },
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: RESTRICTED_NOTICE_TEXT,
+                  font: "Arial", size: 19, color: C.amberText })],
+                spacing: { after: 0 },
+              }),
+            ],
+          }),
+        ],
+      })],
+    }),
+    new Paragraph({
+      children: [new PageBreak()],
+      spacing: { after: 0 },
+    }),
+  ];
+}
+
+async function buildDocument(data, meta, restricted) {
   const patentNumber  = data.Patent_Number || meta.Patent_Number || "Unknown";
   const title         = data.Title         || meta.Title         || "Patent Analysis Report";
   const owner         = data.Owner         || meta.Owner         || "";
@@ -633,6 +695,8 @@ async function buildDocument(data, meta) {
           color: C.navy, characterSpacing: 40 }),
         new TextRun({ text: claimNumber + " \u00B7 " + claimCategory,
           font: "Arial", size: 17, bold: true, color: C.navy, characterSpacing: 40 }),
+        ...(restricted ? [new TextRun({ text: "   \u2014   CONFIDENTIAL \u00B7 RESTRICTED USE  \u2014  See page 2",
+          font: "Arial", size: 15, color: C.amberText, characterSpacing: 20 })] : []),
       ],
       spacing: { before: 320, after: 120 },
     }),
@@ -669,6 +733,7 @@ async function buildDocument(data, meta) {
     emptyPara(),
     claimBlock(claimLabel, claimText),
     emptyPara(),
+    ...(restricted ? restrictedNoticePage() : []),
     ...sectionHeading("Executive Summary"),
     summaryCardTable([
       { label: "Claim Number",         value: claimNumber },
@@ -833,7 +898,8 @@ app.post("/generate", async (req, res) => {
       Standard:      req.query.standard|| "",
     };
 
-    const buf      = await buildDocument(data, meta);
+    const restricted = req.query.restricted === "true" || data.Restricted_Use === true;
+    const buf      = await buildDocument(data, meta, restricted);
     const safeName = (data.Patent_Number || meta.Patent_Number || "report")
       .replace(/[^A-Za-z0-9_-]/g, "_");
     const filename = safeName + "_report.docx";
@@ -854,7 +920,19 @@ app.post("/generate", async (req, res) => {
 // HTML GENERATOR
 // ═════════════════════════════════════════════════════════════════════════
 
-function buildHtml(data, meta) {
+const RESTRICTED_NOTICE_HTML =
+  "This report is confidential and provided solely for internal use in connection " +
+  "with patent licensing, portfolio evaluation, or standards-related strategy. It must " +
+  "not be published, posted, or circulated to any third party without IP Mind\u2019s prior " +
+  "written consent. Where disclosure to a counterparty is necessary, the report may be " +
+  "shared in full or in part provided the counterparty is bound by a written " +
+  "confidentiality undertaking that places equivalent restrictions on use and further " +
+  "distribution, and that requires attribution of IP Mind\u2019s authorship to be retained. " +
+  "The recipient must not use this report to replicate, benchmark, or train models " +
+  "intended to reproduce IP Mind\u2019s methodology or outputs, or to develop competing " +
+  "analysis products or services.";
+
+function buildHtml(data, meta, restricted) {
   const patentNumber  = data.Patent_Number  || meta.Patent_Number  || "";
   const title         = data.Title          || meta.Title          || "";
   const owner         = data.Owner          || meta.Owner          || "";
@@ -1085,6 +1163,10 @@ function buildHtml(data, meta) {
     .identity-meta{display:flex;gap:8px;align-items:center;margin-bottom:16px;}
     .pill{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;padding:3px 10px;border-radius:2px;background:var(--brand-light);color:var(--brand);}
     .pill-navy{background:rgba(15,31,56,.08);color:var(--navy);}
+    .pill-restricted{background:var(--amber-bg);color:var(--amber);}
+    .restricted-notice{margin:24px 0 0;border-left:3px solid var(--amber);background:var(--amber-bg);padding:18px 24px;border-radius:0 var(--radius) var(--radius) 0;}
+    .restricted-label{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);margin-bottom:10px;}
+    .restricted-notice p{font-size:13px;line-height:1.75;color:var(--amberText,#8a5a00);}
     .identity h1{font-family:'Playfair Display',serif;font-size:32px;font-weight:600;color:var(--navy);line-height:1.2;margin-bottom:8px;}
     .identity-grid{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--rule);border-radius:var(--radius);overflow:hidden;margin-top:32px;}
     .identity-cell{padding:16px 20px;border-right:1px solid var(--rule);}
@@ -1195,6 +1277,7 @@ function buildHtml(data, meta) {
         <span class="pill">${esc(patentNumber)}</span>
         <span class="pill pill-navy">${esc(standard)}</span>
         <span class="pill pill-navy">${esc(claimNumber)} &middot; ${esc(claimCategory)}</span>
+        ${restricted ? '<span class="pill pill-restricted">Restricted Use</span>' : ""}
       </div>
       <h1>${esc(title)}</h1>
       <div class="identity-grid">
@@ -1206,6 +1289,11 @@ function buildHtml(data, meta) {
         <div class="claim-label">${esc(claimLabel)}</div>
         <p>${esc(claimText)}</p>
       </div>
+      ${restricted ? `
+      <div class="restricted-notice">
+        <div class="restricted-label">&#9888;&nbsp; Restricted Use Notice</div>
+        <p>${RESTRICTED_NOTICE_HTML}</p>
+      </div>` : ""}
     </div>
     <div class="section">
       <div class="section-heading"><h2>Executive Summary</h2></div>
@@ -1281,7 +1369,7 @@ app.post("/generate-html", (req, res) => {
       Owner:         req.query.owner    || "",
       Standard:      req.query.standard || "",
     };
-    const html = buildHtml(data, meta);
+    const html = buildHtml(data, meta, req.query.restricted === "true" || data.Restricted_Use === true);
     const safeName = (data.Patent_Number || meta.Patent_Number || "report")
       .replace(/[^A-Za-z0-9_-]/g, "_");
     res.json({
