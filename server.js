@@ -665,8 +665,14 @@ async function buildDocument(data, meta, restricted) {
   const pctWeighted   = safeStr(data["Mapped_Percentage_(Weighted)"] || "");
   const essDecision   = safeStr(data.Essentiality_Conclusion || "");
   const opinion       = safeStr(data.Summary       || "");
-  const mappingItems  = data.Mapping_Summary || [];
-  const charts        = data.Claim_Charts  || [];
+  const mappingItems  = (data.Mapping_Summary || []).slice().sort((a, b) => {
+    return (parseInt(a.Index, 10) || 0) - (parseInt(b.Index, 10) || 0);
+  });
+  const charts        = (data.Claim_Charts || []).slice().sort((a, b) => {
+    const ai = parseInt((a.Claim_Feature || {}).Index, 10) || 0;
+    const bi = parseInt((b.Claim_Feature || {}).Index, 10) || 0;
+    return ai - bi;
+  });
   const { label: limLabelRaw, body: limBodyRaw } = parseLimitations(data["Limitation(s)"] || "");
   const limLabel = safeStr(limLabelRaw);
   const limBody  = safeStr(limBodyRaw);
@@ -934,8 +940,14 @@ function buildHtml(data, meta, restricted) {
   const pctWeighted   = safeStr(data["Mapped_Percentage_(Weighted)"] || "");
   const essDecision   = safeStr(data.Essentiality_Conclusion || "");
   const opinion       = safeStr(data.Summary        || "");
-  const mappingItems  = data.Mapping_Summary || [];
-  const charts        = data.Claim_Charts   || [];
+  const mappingItems  = (data.Mapping_Summary || []).slice().sort((a, b) => {
+    return (parseInt(a.Index, 10) || 0) - (parseInt(b.Index, 10) || 0);
+  });
+  const charts        = (data.Claim_Charts || []).slice().sort((a, b) => {
+    const ai = parseInt((a.Claim_Feature || {}).Index, 10) || 0;
+    const bi = parseInt((b.Claim_Feature || {}).Index, 10) || 0;
+    return ai - bi;
+  });
   const { label: limLabelRaw, body: limBodyRaw } = parseLimitations(data["Limitation(s)"] || "");
   const limLabel = safeStr(limLabelRaw);
   const limBody  = safeStr(limBodyRaw);
