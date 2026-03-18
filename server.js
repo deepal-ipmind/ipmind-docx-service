@@ -60,9 +60,19 @@ function shade(fill) { return { fill, type: ShadingType.CLEAR, color: "auto" }; 
 const CM  = { top: 80,  bottom: 80,  left: 120, right: 120 };
 const CMW = { top: 120, bottom: 120, left: 160, right: 160 };
 
+// ── Safe string helper ────────────────────────────────────────────────────
+// Coerces any value to string and strips characters that are illegal in
+// XML 1.0 (control chars 0x00–0x08, 0x0B–0x0C, 0x0E–0x1F, 0xFFFE, 0xFFFF).
+// These can appear in AI-generated content and silently corrupt docx XML.
+function safeStr(val) {
+  if (val === null || val === undefined) return "";
+  // eslint-disable-next-line no-control-regex
+  return String(val).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\uFFFE\uFFFF]/g, "");
+}
+
 // ── Text helpers ──────────────────────────────────────────────────────────
 function run(text, opts = {}) {
-  return new TextRun({ text, font: "Arial", size: 20, color: C.ink, ...opts });
+  return new TextRun({ text: safeStr(text), font: "Arial", size: 20, color: C.ink, ...opts });
 }
 function para(children, opts = {}) {
   if (typeof children === "string") children = [run(children)];
@@ -107,12 +117,12 @@ function claimBlock(label, text) {
           width: { size: PG.W - 60, type: WidthType.DXA },
           children: [
             new Paragraph({
-              children: [new TextRun({ text: label.toUpperCase(),
+              children: [new TextRun({ text: safeStr(label).toUpperCase(),
                 font: "Arial", size: 16, bold: true, color: C.orange, characterSpacing: 40 })],
               spacing: { after: 80 },
             }),
             new Paragraph({
-              children: [new TextRun({ text, font: "Arial", size: 19, color: C.ink, italics: true })],
+              children: [new TextRun({ text: safeStr(text), font: "Arial", size: 19, color: C.ink, italics: true })],
               spacing: { after: 0 },
             }),
           ],
@@ -140,12 +150,12 @@ function summaryCardTable(cards) {
         width: { size: colW, type: WidthType.DXA },
         children: [
           new Paragraph({
-            children: [new TextRun({ text: c.label.toUpperCase(),
+            children: [new TextRun({ text: safeStr(c.label).toUpperCase(),
               font: "Arial", size: 15, bold: true, color: C.muted, characterSpacing: 40 })],
             spacing: { after: 60 },
           }),
           new Paragraph({
-            children: [new TextRun({ text: c.value, font: "Arial",
+            children: [new TextRun({ text: safeStr(c.value), font: "Arial",
               size: c.small ? 20 : 28, bold: true,
               color: c.highlight ? C.amberText : C.navy })],
             spacing: { after: 0 },
@@ -183,7 +193,7 @@ function mappingItem(num, featureText, conclusion, rationale) {
             shading: shade(C.white), margins: CMW,
             width: { size: PG.W - 400, type: WidthType.DXA },
             children: [new Paragraph({
-              children: [new TextRun({ text: featureText, font: "Arial",
+              children: [new TextRun({ text: safeStr(featureText), font: "Arial",
                 size: 20, bold: true, color: C.ink })],
               spacing: { after: 0 },
             })],
@@ -208,14 +218,14 @@ function mappingItem(num, featureText, conclusion, rationale) {
               new Paragraph({
                 children: [
                   new TextRun({ text: "Conclusion:  ", font: "Arial", size: 19, bold: true, color: C.ink }),
-                  new TextRun({ text: conclusion, font: "Arial", size: 19, color: C.mid }),
+                  new TextRun({ text: safeStr(conclusion), font: "Arial", size: 19, color: C.mid }),
                 ],
                 spacing: { after: 80 },
               }),
               new Paragraph({
                 children: [
                   new TextRun({ text: "Brief Rationale:  ", font: "Arial", size: 19, bold: true, color: C.ink }),
-                  new TextRun({ text: rationale, font: "Arial", size: 19, color: C.mid }),
+                  new TextRun({ text: safeStr(rationale), font: "Arial", size: 19, color: C.mid }),
                 ],
                 spacing: { after: 0 },
               }),
@@ -251,7 +261,7 @@ function justificationPanel(text, W = PG.W) {
               spacing: { after: 80 },
             }),
             new Paragraph({
-              children: [new TextRun({ text, font: "Arial", size: 19, color: C.mid })],
+              children: [new TextRun({ text: safeStr(text), font: "Arial", size: 19, color: C.mid })],
               spacing: { after: 0 },
             }),
           ],
@@ -265,20 +275,20 @@ function justificationPanel(text, W = PG.W) {
 function analysisParagraphs(interpretation, mappingDetail, differences, opinion) {
   const lines = Array.isArray(mappingDetail)
     ? mappingDetail
-    : String(mappingDetail || "").split(/\n\n+/).filter(Boolean);
+    : String(safeStr(mappingDetail) || "").split(/\n\n+/).filter(Boolean);
 
   return [
     subHeading("Interpretation"),
-    new Paragraph({ children: [run(interpretation, { size: 19, color: C.mid })], spacing: { after: 120 } }),
+    new Paragraph({ children: [run(safeStr(interpretation), { size: 19, color: C.mid })], spacing: { after: 120 } }),
     subHeading("Mapping Summary"),
     ...lines.map(line => new Paragraph({
-      children: [run(String(line).replace(/\*\*/g, ""), { size: 19, color: C.mid })],
+      children: [run(safeStr(line).replace(/\*\*/g, ""), { size: 19, color: C.mid })],
       spacing: { after: 80 },
     })),
     subHeading("Differences"),
-    new Paragraph({ children: [run(differences, { size: 19, color: C.mid })], spacing: { after: 120 } }),
+    new Paragraph({ children: [run(safeStr(differences), { size: 19, color: C.mid })], spacing: { after: 120 } }),
     subHeading("Overall Opinion"),
-    new Paragraph({ children: [run(opinion, { size: 19, color: C.mid })], spacing: { after: 160 } }),
+    new Paragraph({ children: [run(safeStr(opinion), { size: 19, color: C.mid })], spacing: { after: 160 } }),
   ];
 }
 
@@ -289,14 +299,14 @@ function excerptItem(num, ref, heading, bodyLines, W = PG.W) {
   const bodyChildren = [];
   if (heading) {
     bodyChildren.push(new Paragraph({
-      children: [new TextRun({ text: heading, font: "Arial", size: 16,
+      children: [new TextRun({ text: safeStr(heading), font: "Arial", size: 16,
         bold: true, color: C.navy, characterSpacing: 30 })],
       spacing: { after: 80 },
     }));
   }
   bodyLines.forEach(line => {
     bodyChildren.push(new Paragraph({
-      children: [new TextRun({ text: String(line), font: "Courier New", size: 15, color: C.mid })],
+      children: [new TextRun({ text: safeStr(line), font: "Courier New", size: 15, color: C.mid })],
       spacing: { after: 60 },
     }));
   });
@@ -322,7 +332,7 @@ function excerptItem(num, ref, heading, bodyLines, W = PG.W) {
               left: noBorder, right: solidBorder(C.rule,4) },
             shading: shade(C.surfaceAlt), margins: CM, width: { size: refW, type: WidthType.DXA },
             children: [new Paragraph({
-              children: [new TextRun({ text: ref, font: "Courier New", size: 15, color: C.muted })],
+              children: [new TextRun({ text: safeStr(ref), font: "Courier New", size: 15, color: C.muted })],
               alignment: AlignmentType.RIGHT, spacing: { after: 0 },
             })],
           }),
@@ -344,7 +354,7 @@ function excerptItem(num, ref, heading, bodyLines, W = PG.W) {
 // ── Feature block (landscape claim chart) ────────────────────────────────
 function featureBlock(num, featureText, disclosure, essentiality,
                       analysisChildren, excerptTables, W = PGL.W) {
-  const verdictText = disclosure + "  ·  " + essentiality;
+  const verdictText = safeStr(disclosure) + "  ·  " + safeStr(essentiality);
   const colW = Math.floor(W / 2);
 
   const leftChildren = [
@@ -379,7 +389,7 @@ function featureBlock(num, featureText, disclosure, essentiality,
             margins: { top: 120, bottom: 120, left: 160, right: 80 },
             width: { size: 400, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER,
             children: [new Paragraph({
-              children: [new TextRun({ text: String(num), font: "Arial",
+              children: [new TextRun({ text: safeStr(num), font: "Arial",
                 size: 28, bold: true, color: C.white })],
               alignment: AlignmentType.CENTER, spacing: { after: 0 },
             })],
@@ -389,7 +399,7 @@ function featureBlock(num, featureText, disclosure, essentiality,
             margins: { top: 120, bottom: 120, left: 80, right: 160 },
             width: { size: W - 400, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER,
             children: [new Paragraph({
-              children: [new TextRun({ text: featureText, font: "Arial",
+              children: [new TextRun({ text: safeStr(featureText), font: "Arial",
                 size: 19, color: "DDDDDD", italics: true })],
               spacing: { after: 0 },
             })],
@@ -644,36 +654,38 @@ function restrictedNoticePage() {
 // ═════════════════════════════════════════════════════════════════════════
 
 async function buildDocument(data, meta, restricted) {
-  const patentNumber  = data.Patent_Number || meta.Patent_Number || "Unknown";
-  const title         = data.Title         || meta.Title         || "Patent Analysis Report";
-  const owner         = data.Owner         || meta.Owner         || "";
-  const standard      = data.Standard      || meta.Standard      || "";
-  const claimNumber   = data.Claim_Number  || "";
-  const claimText     = data.Claim         || "";
-  const claimCategory = data.Claim_Category|| "";
-  const pctMapped     = data.Mapped_Percentage || "";
-  const pctWeighted   = data["Mapped_Percentage_(Weighted)"] || "";
-  const essDecision   = data.Essentiality_Conclusion || "";
-  const opinion       = data.Summary       || "";
+  const patentNumber  = safeStr(data.Patent_Number || meta.Patent_Number || "Unknown");
+  const title         = safeStr(data.Title         || meta.Title         || "Patent Analysis Report");
+  const owner         = safeStr(data.Owner         || meta.Owner         || "");
+  const standard      = safeStr(data.Standard      || meta.Standard      || "");
+  const claimNumber   = safeStr(data.Claim_Number  || "");
+  const claimText     = safeStr(data.Claim         || "");
+  const claimCategory = safeStr(data.Claim_Category|| "");
+  const pctMapped     = safeStr(data.Mapped_Percentage || "");
+  const pctWeighted   = safeStr(data["Mapped_Percentage_(Weighted)"] || "");
+  const essDecision   = safeStr(data.Essentiality_Conclusion || "");
+  const opinion       = safeStr(data.Summary       || "");
   const mappingItems  = data.Mapping_Summary || [];
   const charts        = data.Claim_Charts  || [];
-  const { label: limLabel, body: limBody } = parseLimitations(data["Limitation(s)"] || "");
-  const claimLabel    = claimNumber + " \u2014 " + claimCategory + " Claim";
+  const { label: limLabelRaw, body: limBodyRaw } = parseLimitations(data["Limitation(s)"] || "");
+  const limLabel = safeStr(limLabelRaw);
+  const limBody  = safeStr(limBodyRaw);
+  const claimLabel    = safeStr(claimNumber) + " \u2014 " + safeStr(claimCategory) + " Claim";
 
   const section1Children = [
     new Paragraph({
       children: [
-        new TextRun({ text: patentNumber + "  ", font: "Arial", size: 17, bold: true,
+        new TextRun({ text: safeStr(patentNumber) + "  ", font: "Arial", size: 17, bold: true,
           color: C.orange, characterSpacing: 40 }),
-        new TextRun({ text: standard + "  ", font: "Arial", size: 17, bold: true,
+        new TextRun({ text: safeStr(standard) + "  ", font: "Arial", size: 17, bold: true,
           color: C.navy, characterSpacing: 40 }),
-        new TextRun({ text: claimNumber + " \u00B7 " + claimCategory,
+        new TextRun({ text: safeStr(claimNumber) + " \u00B7 " + safeStr(claimCategory),
           font: "Arial", size: 17, bold: true, color: C.navy, characterSpacing: 40 }),
       ],
       spacing: { before: 320, after: 120 },
     }),
     new Paragraph({
-      children: [new TextRun({ text: title, font: "Georgia", size: 52, bold: true, color: C.navy })],
+      children: [new TextRun({ text: safeStr(title), font: "Georgia", size: 52, bold: true, color: C.navy })],
       spacing: { after: 280 },
     }),
     new Table({
@@ -682,19 +694,19 @@ async function buildDocument(data, meta, restricted) {
       borders: noBorders,
       rows: [new TableRow({
         children: [
-          { label: "Patent Number", value: patentNumber },
-          { label: "Owner",         value: owner },
-          { label: "Standard",      value: standard },
+          { label: "Patent Number", value: safeStr(patentNumber) },
+          { label: "Owner",         value: safeStr(owner) },
+          { label: "Standard",      value: safeStr(standard) },
         ].map(cell => new TableCell({
           borders: { top: solidBorder(C.rule,4), bottom: solidBorder(C.rule,4),
             left: noBorder, right: solidBorder(C.rule,4) },
           shading: shade(C.white), margins: CMW,
           width: { size: Math.floor(PG.W/3), type: WidthType.DXA },
           children: [
-            new Paragraph({ children: [new TextRun({ text: cell.label.toUpperCase(),
+            new Paragraph({ children: [new TextRun({ text: safeStr(cell.label).toUpperCase(),
               font: "Arial", size: 15, bold: true, color: C.muted, characterSpacing: 40 })],
               spacing: { after: 40 } }),
-            new Paragraph({ children: [new TextRun({ text: cell.value,
+            new Paragraph({ children: [new TextRun({ text: safeStr(cell.value),
               font: "Arial", size: 20, bold: true, color: C.navy })],
               spacing: { after: 0 } }),
           ],
@@ -767,7 +779,7 @@ async function buildDocument(data, meta, restricted) {
     emptyPara(),
     ...sectionHeading("Mapping Summary"),
     ...mappingItems.flatMap((item, i) => [
-      mappingItem(i + 1, item.Key_Feature, item.Conclusions, item.Brief_Rationale),
+      mappingItem(i + 1, safeStr(item.Key_Feature), safeStr(item.Conclusions), safeStr(item.Brief_Rationale)),
       emptyPara(),
     ]),
   ];
@@ -788,12 +800,12 @@ async function buildDocument(data, meta, restricted) {
       const innerW = colW - (CMW.left + CMW.right);
       const analysisChildren = [
         ...analysisParagraphs(
-          ana.Interpretation  || "",
+          safeStr(ana.Interpretation  || ""),
           ana.Mapping_Summary || "",
-          ana.Differences     || "",
-          ana.Overall_Opinion || ""
+          safeStr(ana.Differences     || ""),
+          safeStr(ana.Overall_Opinion || "")
         ),
-        justificationPanel(dec.Justification || "", innerW),
+        justificationPanel(safeStr(dec.Justification || ""), innerW),
       ];
       const excerptTables = excRaw.map((excStr) => {
         const exc = parseExcerpt(excStr);
@@ -801,9 +813,9 @@ async function buildDocument(data, meta, restricted) {
       });
       return featureBlock(
         feat.Index || (charts.indexOf(chart) + 1),
-        feat.Text  || "",
-        dec.Disclosure || "",
-        dec.Essentiality_Classification || "",
+        safeStr(feat.Text  || ""),
+        safeStr(dec.Disclosure || ""),
+        safeStr(dec.Essentiality_Classification || ""),
         analysisChildren,
         excerptTables,
         PGL.W
@@ -911,30 +923,32 @@ const RESTRICTED_NOTICE_HTML =
   "analysis products or services.";
 
 function buildHtml(data, meta, restricted) {
-  const patentNumber  = data.Patent_Number  || meta.Patent_Number  || "";
-  const title         = data.Title          || meta.Title          || "";
-  const owner         = data.Owner          || meta.Owner          || "";
-  const standard      = data.Standard       || meta.Standard       || "";
-  const claimNumber   = data.Claim_Number   || "";
-  const claimText     = data.Claim          || "";
-  const claimCategory = data.Claim_Category || "";
-  const pctMapped     = data.Mapped_Percentage || "";
-  const pctWeighted   = data["Mapped_Percentage_(Weighted)"] || "";
-  const essDecision   = data.Essentiality_Conclusion || "";
-  const opinion       = data.Summary        || "";
+  const patentNumber  = safeStr(data.Patent_Number  || meta.Patent_Number  || "");
+  const title         = safeStr(data.Title          || meta.Title          || "");
+  const owner         = safeStr(data.Owner          || meta.Owner          || "");
+  const standard      = safeStr(data.Standard       || meta.Standard       || "");
+  const claimNumber   = safeStr(data.Claim_Number   || "");
+  const claimText     = safeStr(data.Claim          || "");
+  const claimCategory = safeStr(data.Claim_Category || "");
+  const pctMapped     = safeStr(data.Mapped_Percentage || "");
+  const pctWeighted   = safeStr(data["Mapped_Percentage_(Weighted)"] || "");
+  const essDecision   = safeStr(data.Essentiality_Conclusion || "");
+  const opinion       = safeStr(data.Summary        || "");
   const mappingItems  = data.Mapping_Summary || [];
   const charts        = data.Claim_Charts   || [];
-  const { label: limLabel, body: limBody } = parseLimitations(data["Limitation(s)"] || "");
+  const { label: limLabelRaw, body: limBodyRaw } = parseLimitations(data["Limitation(s)"] || "");
+  const limLabel = safeStr(limLabelRaw);
+  const limBody  = safeStr(limBodyRaw);
   const claimLabel = `${claimNumber} \u2014 ${claimCategory} Claim`;
 
   function esc(str) {
-    return String(str || "")
+    return safeStr(str)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;")
       .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 
   function renderInline(str) {
-    return String(str || "")
+    return safeStr(str)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
       .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
       .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, "<em>$1</em>");
