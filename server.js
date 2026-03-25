@@ -30,9 +30,25 @@ function requireApiKey(req, res, next) {
 
 app.use(requireApiKey);
 
-// ── Embedded logo (base64 PNG, navy background) ──────────────────────────
-const LOGO_B64 = "iVBORw0KGgoAAAANSUhEUgAAAUAAAABpCAYAAABLRPrgAAAABmJLR0QA/wD/AP+gvaeTAAAY4klEqVR4nO2bebQdVbGHf8UkyEwMiRAiCkQiyDwKKAJRkEFRRuGpCD4BEVBQUViCPBFkkMElLMUBUZmePomggEBkkEEgAQXDPIYkkBBISEiAJPd7f+x9vCcnfXo6Q5+bW99aWRfO6V27uvt09d69a1dJjuM4juM4juM4juM4juM4juM4juM4juM4jjPgsaoVKAvwTknvkTRM0rskrSxp2bpD5kh6XdJ0SS9Kmmpmfd3W03Gc3mVAGEBgbUk7SNpa0uaSRktaq6CYtyQ9KelhSeMl/UPS/Wb2VhtVdRxnANGTBhBYWtJOkj4paQ9J7044bI6k5yVNkfSKpNmS5kuaJ2kVSctIWkPSUEkjFQzm0g0y5kq6Q9L1kq41s8ntPhfHcXqXnjKAwAckHSHpYEnD674aIelOSfdKmiDpETObWlD2cpJGSdpU0lYKI8ot1G8U+2Ifl0m6xszmlj4Rx3GcPAAG7A2MY1H+BZwGbAks1aG+VwcOAK4AXq/r+zXgHGBEJ/p1HGeQEw3fvsA/GwzP+cAHK9BnBeDgBkP8FnCJG0LHcdoGsB1wT52heQo4Mq7sVg6wMfAr4O2o30+BJ4Glq9bNcZweB1gu+vVqo75bgPdWrVdRCBmxv1y30v04sFnVejmOMwAgbGF7oW7kdBoZ6ex7BWBL4O6oex/wU2ClqvVyHGcAAawCXAwsjMbkRULNjp5cPCAURvpNnb5PALtWrZfjOAOYOKKqz9T8LPDVXhlVEfIN/paQxoo47f0WHuLiOE67APYGJtQZwpmEAOqurxgDKxKKNd1ep8+c6L8c2m19HMcZBBBq/e4B/JVF64Q8Sgg12Z6StUdy9D0UOAS4hkXLYL4EnAokFVRyHGcJoadi14BRkr4o6RAtWpltlqQ7Jd0jabykiZImmRkFZK8gaUNJm0jaWtJOkj6o/mswXyFrzGWSxnrlNsdZ8ukpA1iDECu4naRPSdpd0sZaXNc3JT2rkOJquqTXas3jsctLWl3SUEkjJa2V0NVMSeMUUmz9ycxmtPVEHMfpaXrSADYCrClpB4U8gJtJGi1pHRXTf7akxyU9LGmCpLsl/dPMFrZXW8dxBgoDwgAmEVdkR0oaLmmIpJUk1eIKF0p6XWHq/LKkyWb2ShV6Oo7jOI7jOI7jOI7jOI7jOI7jOI7jOI7jOI7jOE4H+X82HH2b5xE8bQAAAABJRU5ErkJggg==";
-const logoData = Buffer.from(LOGO_B64, "base64");
+// ── Logo loading ──────────────────────────────────────────────────────────
+// Tries to load logo_header.png from the same directory as this file.
+// Falls back to a 1×1 transparent PNG so the header renders without crashing.
+// To deploy the logo: place logo_header.png alongside server.js on Azure.
+const LOGO_FALLBACK_B64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+
+let logoData;
+try {
+  const fs   = require("fs");
+  const path = require("path");
+  const logoPath = path.join(__dirname, "logo_header.png");
+  logoData = fs.readFileSync(logoPath);
+  console.log("Logo loaded from", logoPath, "(" + logoData.length + " bytes)");
+} catch (e) {
+  console.warn("logo_header.png not found — header will render without logo. " +
+    "Place logo_header.png alongside server.js to enable it.");
+  logoData = Buffer.from(LOGO_FALLBACK_B64, "base64");
+}
 
 // ── Palette ──────────────────────────────────────────────────────────────
 const C = {
