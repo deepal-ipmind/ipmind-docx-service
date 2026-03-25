@@ -31,7 +31,7 @@ function requireApiKey(req, res, next) {
 app.use(requireApiKey);
 
 // ── Embedded logo (base64 PNG, navy background) ──────────────────────────
-const LOGO_B64 = "iVBORw0KGgoAAAANSUhEUgAAAUAAAABpCAYAAABLRPrgAAAABmJLR0QA/wD/AP+gvaeTAAAY4klEQVR4nO2bebQdVbGHf8UkyEwMiRAiCkQiyDwKKAJRkEFRRuGpCD4BEVBQUViCPBFkkMElLMUBUZmePomggEBkkEEgAQXDPIYkkBBISEiAJPd7f+x9vCcnfXo6Q5+bW99aWRfO6V27uvt09d69a1dJjuM4juM4juM4juM4juM4juM4juM4juM4jjPgsaoVKAvwTknvkTRM0rskrSxp2bpD5kh6XdJ0SS9Kmmpmfd3W03Gc3mVAGEBgbUk7SNpa0uaSRktaq6CYtyQ9KelhSeMl/UPS/Wb2VhtVdRxnANGTBhBYWtJOkj4paQ9J7044bI6k5yVNkfSKpNmS5kuaJ2kVSctIWkPSUEkjFQzm0g0y5kq6Q9L1kq41s8ntPhfHcXqXnjKAwAckHSHpYEnD674aIelOSfdKmiDpETObWlD2cpJGSdpU0lYKI8ot1G8U+2Ifl0m6xszmlj4Rx3GcPAAG7A2MY1H+BZwGbAks1aG+VwcOAK4AXq/r+zXgHGBEJ/p1HGeQEw3fvsA/GwzP+cAHK9BnBeDgBkP8FnCJG0LHcdoGsB1wT52heQo4Mq7sVg6wMfAr4O2o30+BJ4Glq9bNcZweB1gu+vVqo75bgPdWrVdRCBmxv1y30v04sFnVejmOMwAgbGF7oW7kdBoZ6ex7BWBL4O6oex/wU2ClqvVyHGcAAawCXAwsjMbkRULNjp5cPCAURvpNnb5PALtWrZfjOAOYOKKqz9T8LPDVXhlVEfIN/paQxoo47f0WHuLiOE67APYGJtQZwpmEAOqurxgDKxKKNd1ep8+c6L8c2m19HMcZBBBq/e4B/JVF64Q8Sgg12Z6StUdy9D0UOAS4hkXLYL4EnAokFVRyHGcJoadi14BRkr4o6RAtWpltlqQ7Jd0jabykiZImmRkFZK8gaUNJm0jaWtJOkj6o/mswXyFrzGWSxnrlNsdZ8ukpA1iDECu4naRPSdpd0sZaXNc3JT2rkOJquqTXas3jsctLWl3SUEkjJa2V0NVMSeMUUmz9ycxmtPVEHMfpaXrSADYCrClpB4U8gJtJGi1pHRXTf7akxyU9LGmCpLsl/dPMFrZXW8dxBgoDwgAmEVdkR0oaLmmIpJUk1eIKF0p6XWHq/LKkyWb2ShV6Oo7jOI7jOI7jOI7jOI7jOI7jOI7jOI7jOI7jOE4H+X82HH2b5xE8bQAAAABJRU5ErkJggg==";
+const LOGO_B64 = "iVBORw0KGgoAAAANSUhEUgAAAUAAAABpCAYAAABLRPrgAAAABmJLR0QA/wD/AP+gvaeTAAAY4klEqVR4nO2bebQdVbGHf8UkyEwMiRAiCkQiyDwKKAJRkEFRRuGpCD4BEVBQUViCPBFkkMElLMUBUZmePomggEBkkEEgAQXDPIYkkBBISEiAJPd7f+x9vCcnfXo6Q5+bW99aWRfO6V27uvt09d69a1dJjuM4juM4juM4juM4juM4juM4juM4juM4jjPgsaoVKAvwTknvkTRM0rskrSxp2bpD5kh6XdJ0SS9Kmmpmfd3W03Gc3mVAGEBgbUk7SNpa0uaSRktaq6CYtyQ9KelhSeMl/UPS/Wb2VhtVdRxnANGTBhBYWtJOkj4paQ9J7044bI6k5yVNkfSKpNmS5kuaJ2kVSctIWkPSUEkjFQzm0g0y5kq6Q9L1kq41s8ntPhfHcXqXnjKAwAckHSHpYEnD674aIelOSfdKmiDpETObWlD2cpJGSdpU0lYKI8ot1G8U+2Ifl0m6xszmlj4Rx3GcPAAG7A2MY1H+BZwGbAks1aG+VwcOAK4AXq/r+zXgHGBEJ/p1HGeQEw3fvsA/GwzP+cAHK9BnBeDgBkP8FnCJG0LHcdoGsB1wT52heQo4Mq7sVg6wMfAr4O2o30+BJ4Glq9bNcZweB1gu+vVqo75bgPdWrVdRCBmxv1y30v04sFnVejmOMwAgbGF7oW7kdBoZ6ex7BWBL4O6oex/wU2ClqvVyHGcAAawCXAwsjMbkRULNjp5cPCAURvpNnb5PALtWrZfjOAOYOKKqz9T8LPDVXhlVEfIN/paQxoo47f0WHuLiOE67APYGJtQZwpmEAOqurxgDKxKKNd1ep8+c6L8c2m19HMcZBBBq/e4B/JVF64Q8Sgg12Z6StUdy9D0UOAS4hkXLYL4EnAokFVRyHGcJoadi14BRkr4o6RAtWpltlqQ7Jd0jabykiZImmRkFZK8gaUNJm0jaWtJOkj6o/mswXyFrzGWSxnrlNsdZ8ukpA1iDECu4naRPSdpd0sZaXNc3JT2rkOJquqTXas3jsctLWl3SUEkjJa2V0NVMSeMUUmz9ycxmtPVEHMfpaXrSADYCrClpB4U8gJtJGi1pHRXTf7akxyU9LGmCpLsl/dPMFrZXW8dxBgoDwgAmEVdkR0oaLmmIpJUk1eIKF0p6XWHq/LKkyWb2ShV6Oo7jOI7jOI7jOI7jOI7jOI7jOI7jOI7jOI7jOE4H+X82HH2b5xE8bQAAAABJRU5ErkJggg==";
 const logoData = Buffer.from(LOGO_B64, "base64");
 
 // ── Palette ──────────────────────────────────────────────────────────────
@@ -61,9 +61,6 @@ const CM  = { top: 80,  bottom: 80,  left: 120, right: 120 };
 const CMW = { top: 120, bottom: 120, left: 160, right: 160 };
 
 // ── Safe string helper ────────────────────────────────────────────────────
-// Coerces any value to string and strips characters that are illegal in
-// XML 1.0 (control chars 0x00–0x08, 0x0B–0x0C, 0x0E–0x1F, 0xFFFE, 0xFFFF).
-// These can appear in AI-generated content and silently corrupt docx XML.
 function safeStr(val) {
   if (val === null || val === undefined) return "";
   // eslint-disable-next-line no-control-regex
@@ -73,10 +70,6 @@ function safeStr(val) {
 // ── Text helpers ──────────────────────────────────────────────────────────
 function run(text, opts = {}) {
   return new TextRun({ text: safeStr(text), font: "Arial", size: 20, color: C.ink, ...opts });
-}
-function para(children, opts = {}) {
-  if (typeof children === "string") children = [run(children)];
-  return new Paragraph({ children, spacing: { after: 80 }, ...opts });
 }
 function emptyPara() { return new Paragraph({ children: [run("")], spacing: { after: 0 } }); }
 
@@ -556,6 +549,137 @@ function disclaimerSection() {
   ];
 }
 
+// ── Methodology guide — Word ──────────────────────────────────────────────
+// Renders a "Key to Terms" reference table at the top of the landscape
+// claim chart section. Silently omitted when data.Methodology is absent.
+function methodologyDocx(methodology, W = PGL.W) {
+  if (!methodology) return [];
+
+  const metrics    = methodology.universal_metrics       || {};
+  const disclosure = methodology.disclosure_categories   || [];
+  const ess        = methodology.essentiality_tiers       || [];
+
+  const labelW = 2800;
+  const defW   = W - labelW;
+
+  // Group header: full-width navy bar with white uppercase label
+  function groupHeaderRow(title) {
+    return new TableRow({
+      children: [new TableCell({
+        columnSpan: 2,
+        borders: {
+          top: solidBorder(C.rule, 4), bottom: solidBorder(C.rule, 4),
+          left: solidBorder(C.rule, 4), right: solidBorder(C.rule, 4),
+        },
+        shading: shade(C.navy),
+        margins: { top: 80, bottom: 80, left: 160, right: 160 },
+        width: { size: W, type: WidthType.DXA },
+        children: [new Paragraph({
+          children: [new TextRun({ text: title.toUpperCase(),
+            font: "Arial", size: 15, bold: true, color: C.white, characterSpacing: 60 })],
+          spacing: { after: 0 },
+        })],
+      })],
+    });
+  }
+
+  // Term row: label cell (left) | definition cell (right)
+  function termRow(label, definition, labelColor = C.navy, labelBg = C.surfaceAlt) {
+    return new TableRow({
+      children: [
+        new TableCell({
+          borders: {
+            top: noBorder, bottom: solidBorder(C.rule, 4),
+            left: solidBorder(C.rule, 4), right: solidBorder(C.rule, 4),
+          },
+          shading: shade(labelBg),
+          margins: CM,
+          width: { size: labelW, type: WidthType.DXA },
+          verticalAlign: VerticalAlign.TOP,
+          children: [new Paragraph({
+            children: [new TextRun({ text: safeStr(label),
+              font: "Arial", size: 17, bold: true, color: labelColor })],
+            spacing: { after: 0 },
+          })],
+        }),
+        new TableCell({
+          borders: {
+            top: noBorder, bottom: solidBorder(C.rule, 4),
+            left: noBorder, right: solidBorder(C.rule, 4),
+          },
+          shading: shade(C.white),
+          margins: CM,
+          width: { size: defW, type: WidthType.DXA },
+          verticalAlign: VerticalAlign.TOP,
+          children: [new Paragraph({
+            children: [new TextRun({ text: safeStr(definition),
+              font: "Arial", size: 17, color: C.mid })],
+            spacing: { after: 0 },
+          })],
+        }),
+      ],
+    });
+  }
+
+  // Pick label colour/bg based on category type
+  function disclosureStyle(label) {
+    const l = (label || "").toLowerCase();
+    if (l.includes("not disclosed"))                         return { color: "8A0000", bg: "FDF0F0" };
+    if (l.includes("explicitly") || l.includes("implied"))  return { color: C.greenText, bg: C.greenBg };
+    return { color: C.amberText, bg: C.amberBg }; // partial, functional equivalence
+  }
+
+  function essStyle(label) {
+    const l = (label || "").toLowerCase();
+    if (l.includes("not essential") || l.includes("non-technical")) return { color: "8A0000", bg: "FDF0F0" };
+    if (l.includes("conditional"))   return { color: C.amberText, bg: C.amberBg };
+    if (l.includes("essential"))     return { color: C.greenText,  bg: C.greenBg };
+    return { color: C.navy, bg: C.surfaceAlt }; // implementation matter etc.
+  }
+
+  const rows = [];
+
+  // Metrics section
+  rows.push(groupHeaderRow("Metrics"));
+  if (metrics.percentage_mapped) rows.push(termRow("Percentage Mapped", metrics.percentage_mapped));
+  if (metrics.weighted_mapping)  rows.push(termRow("Weighted Mapping",  metrics.weighted_mapping));
+
+  // Disclosure categories section
+  if (disclosure.length > 0) {
+    rows.push(groupHeaderRow("Disclosure Categories"));
+    disclosure.forEach(item => {
+      const s = disclosureStyle(item.label);
+      rows.push(termRow(safeStr(item.label), safeStr(item.definition), s.color, s.bg));
+    });
+  }
+
+  // Essentiality tiers section
+  if (ess.length > 0) {
+    rows.push(groupHeaderRow("Essentiality Tiers"));
+    ess.forEach(item => {
+      const s = essStyle(item.label);
+      rows.push(termRow(safeStr(item.label), safeStr(item.definition), s.color, s.bg));
+    });
+  }
+
+  return [
+    new Paragraph({
+      children: [new TextRun({ text: "Key to Terms", font: "Georgia",
+        size: 28, bold: true, color: C.navy })],
+      spacing: { before: 320, after: 160 },
+      border: { bottom: solidBorder(C.rule, 4) },
+    }),
+    new Table({
+      width: { size: W, type: WidthType.DXA },
+      columnWidths: [labelW, defW],
+      borders: noBorders,
+      rows,
+    }),
+    emptyPara(),
+    emptyPara(),
+  ];
+}
+
 // ── Parse excerpt markdown string ─────────────────────────────────────────
 function parseExcerpt(excStr) {
   const numMatch = excStr.match(/\*\*Excerpt_Number:\*\*\s*([^\n\s]+)/);
@@ -665,6 +789,7 @@ async function buildDocument(data, meta, restricted) {
   const pctWeighted   = safeStr(data["Mapped_Percentage_(Weighted)"] || "");
   const essDecision   = safeStr(data.Essentiality_Conclusion || "");
   const opinion       = safeStr(data.Summary       || "");
+  const methodology   = data.Methodology || null;
   const mappingItems  = (data.Mapping_Summary || []).slice().sort((a, b) => {
     return (parseInt(a.Index, 10) || 0) - (parseInt(b.Index, 10) || 0);
   });
@@ -676,7 +801,7 @@ async function buildDocument(data, meta, restricted) {
   const { label: limLabelRaw, body: limBodyRaw } = parseLimitations(data["Limitation(s)"] || "");
   const limLabel = safeStr(limLabelRaw);
   const limBody  = safeStr(limBodyRaw);
-  const claimLabel    = safeStr(claimNumber) + " \u2014 " + safeStr(claimCategory) + " Claim";
+  const claimLabel = safeStr(claimNumber) + " \u2014 " + safeStr(claimCategory) + " Claim";
 
   const section1Children = [
     new Paragraph({
@@ -797,6 +922,8 @@ async function buildDocument(data, meta, restricted) {
       spacing: { before: 480, after: 160 },
       border: { bottom: solidBorder(C.rule, 4) },
     }),
+    // ── Key to Terms — only rendered when Methodology is present in payload
+    ...methodologyDocx(methodology, PGL.W),
     ...charts.flatMap(chart => {
       const feat = chart.Claim_Feature || {};
       const dec  = chart.Decision      || {};
@@ -940,6 +1067,7 @@ function buildHtml(data, meta, restricted) {
   const pctWeighted   = safeStr(data["Mapped_Percentage_(Weighted)"] || "");
   const essDecision   = safeStr(data.Essentiality_Conclusion || "");
   const opinion       = safeStr(data.Summary        || "");
+  const methodology   = data.Methodology || null;
   const mappingItems  = (data.Mapping_Summary || []).slice().sort((a, b) => {
     return (parseInt(a.Index, 10) || 0) - (parseInt(b.Index, 10) || 0);
   });
@@ -1021,7 +1149,6 @@ function buildHtml(data, meta, restricted) {
   }
 
   // ── Colour helpers ────────────────────────────────────────────────────
-  // Essentiality drives the overall card + text colour
   function essClasses(decision) {
     const d = (decision || "").toLowerCase();
     if (d.includes("not essential"))  return { card: "", value: "red", dot: "dot-red", verdict: "red", badge: "badge-red" };
@@ -1030,13 +1157,80 @@ function buildHtml(data, meta, restricted) {
     return { card: "highlight", value: "amber", dot: "dot-amber", verdict: "amber", badge: "badge-amber" };
   }
 
-  // Disclosure is assessed independently — Explicitly/Implied = green, Partially = amber, Not = red
   function disclosureClasses(disclosure) {
     const d = (disclosure || "").toLowerCase();
     if (d.includes("not disclosed"))  return { dot: "dot-red",   verdict: "red",   badge: "badge-red"   };
     if (d.includes("explicitly") || d.includes("implied")) return { dot: "dot-green", verdict: "green", badge: "badge-green" };
-    // "Partially Disclosed" and anything else → amber
     return { dot: "dot-amber", verdict: "amber", badge: "badge-amber" };
+  }
+
+  // Label CSS class for the methodology guide rows
+  function disclosureLabelClass(label) {
+    const l = (label || "").toLowerCase();
+    if (l.includes("not disclosed"))                        return "meth-label-red";
+    if (l.includes("explicitly") || l.includes("implied")) return "meth-label-green";
+    return "meth-label-amber"; // partial, functional equivalence
+  }
+
+  function essLabelClass(label) {
+    const l = (label || "").toLowerCase();
+    if (l.includes("not essential") || l.includes("non-technical")) return "meth-label-red";
+    if (l.includes("conditional"))   return "meth-label-amber";
+    if (l.includes("essential"))     return "meth-label-green";
+    return "meth-label-navy"; // implementation matter etc.
+  }
+
+  // ── Methodology guide HTML ────────────────────────────────────────────
+  // Collapsed by default; expands on click; always printed expanded.
+  function buildMethodologyHtml(meth) {
+    if (!meth) return "";
+    const metrics    = meth.universal_metrics       || {};
+    const disclosure = meth.disclosure_categories   || [];
+    const ess        = meth.essentiality_tiers       || [];
+
+    function groupHeader(title) {
+      return `<div class="meth-group-header">${esc(title)}</div>`;
+    }
+
+    function termRow(label, definition, labelClass) {
+      return `
+        <div class="meth-row">
+          <div class="meth-label ${labelClass}">${esc(label)}</div>
+          <div class="meth-def">${esc(definition)}</div>
+        </div>`;
+    }
+
+    let inner = "";
+
+    inner += groupHeader("Metrics");
+    if (metrics.percentage_mapped) inner += termRow("Percentage Mapped", metrics.percentage_mapped, "meth-label-navy");
+    if (metrics.weighted_mapping)  inner += termRow("Weighted Mapping",  metrics.weighted_mapping,  "meth-label-navy");
+
+    if (disclosure.length > 0) {
+      inner += groupHeader("Disclosure Categories");
+      disclosure.forEach(item => {
+        inner += termRow(item.label, item.definition, disclosureLabelClass(item.label));
+      });
+    }
+
+    if (ess.length > 0) {
+      inner += groupHeader("Essentiality Tiers");
+      ess.forEach(item => {
+        inner += termRow(item.label, item.definition, essLabelClass(item.label));
+      });
+    }
+
+    return `
+    <div class="methodology-panel">
+      <button class="methodology-toggle" onclick="toggleMethodology(this)" aria-expanded="false">
+        <span class="meth-toggle-left">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>Key to Terms</span>
+        </span>
+        <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="methodology-body">${inner}</div>
+    </div>`;
   }
 
   function parseExcerptHtml(excStr) {
@@ -1065,18 +1259,16 @@ function buildHtml(data, meta, restricted) {
   function buildMappingSummaryHtml(items) {
     return items.map(item => {
       const conclusionsStr = item.Conclusions || "";
-      // Badge colour is driven by the disclosure part (before the pipe), not the essentiality
       const disclosurePart = conclusionsStr.includes("|")
         ? conclusionsStr.split("|")[0].trim()
         : conclusionsStr;
       const bc = disclosureClasses(disclosurePart).badge;
-      const badgeLabel = disclosurePart;
       return `
         <div class="mapping-item">
           <div class="mapping-item-header">
             <div class="feat-num">${esc(item.Index)}</div>
             <div class="feat-text">${esc(item.Key_Feature)}</div>
-            <div><span class="badge ${bc}">${esc(badgeLabel)}</span></div>
+            <div><span class="badge ${bc}">${esc(disclosurePart)}</span></div>
           </div>
           <div class="mapping-item-body">
             <p><strong>Conclusion:</strong> ${esc(conclusionsStr)}</p>
@@ -1092,14 +1284,11 @@ function buildHtml(data, meta, restricted) {
       const dec   = chart.Decision      || {};
       const ana   = chart.Analysis      || {};
       const excRaw = chart.Cited_Excerpts || [];
-      const disclosure = dec.Disclosure || "";
-      const essClass   = dec.Essentiality_Classification || "";
+      const disclosure    = dec.Disclosure || "";
+      const essClass      = dec.Essentiality_Classification || "";
       const justification = dec.Justification || "";
-
-      // Disclosure and essentiality are coloured independently
       const dc = disclosureClasses(disclosure);
       const fc = essClasses(essClass);
-
       const parsedExcs = excRaw.map(parseExcerptHtml);
       const excItemsHtml = parsedExcs.map(exc => `
               <div class="excerpt-item">
@@ -1112,7 +1301,6 @@ function buildHtml(data, meta, restricted) {
                   ${exc.bodyHtml}
                 </div>
               </div>`).join("\n");
-
       return `
       <div class="claim-feature-block">
         <div class="cfb-header">
@@ -1168,7 +1356,7 @@ function buildHtml(data, meta, restricted) {
     html{scroll-behavior:smooth;}
     body{font-family:'Source Sans 3',sans-serif;font-size:15px;line-height:1.7;color:var(--ink);background:var(--bg);}
     @page{margin:2cm;}
-    @media print{.excerpt-toggle{display:none;}.excerpt-body{display:block!important;}}
+    @media print{.excerpt-toggle{display:none;}.excerpt-body{display:block!important;}.methodology-toggle{display:none;}.methodology-body{display:block!important;}}
     .page-wrap{max-width:1040px;margin:0 auto;padding:0 32px 80px;}
     .brand-rule{height:4px;background:var(--brand);}
     .header-bar{background:var(--navy);}
@@ -1267,6 +1455,22 @@ function buildHtml(data, meta, restricted) {
     .exc-table{width:100%;border-collapse:collapse;font-size:11px;margin:8px 0;}
     .exc-table th,.exc-table td{border:1px solid var(--rule);padding:5px 8px;text-align:left;vertical-align:top;}
     .exc-table th{background:var(--surface-alt);font-weight:600;color:var(--navy);}
+    /* ── Methodology Key to Terms ──────────────────────────────────────── */
+    .methodology-panel{border:1px solid var(--rule);border-radius:var(--radius);overflow:hidden;margin-top:16px;}
+    .methodology-toggle{width:100%;background:var(--surface-alt);border:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:13px 20px;color:var(--navy);font-family:'Source Sans 3',sans-serif;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;transition:background .15s;}
+    .methodology-toggle:hover{background:#ebebea;}
+    .meth-toggle-left{display:flex;align-items:center;gap:8px;}
+    .methodology-body{display:none;border-top:1px solid var(--rule);}.methodology-body.open{display:block;}
+    .meth-group-header{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:12px 20px 6px;background:var(--surface);border-bottom:1px solid var(--rule);}
+    .meth-row{display:grid;grid-template-columns:200px 1fr;border-bottom:1px solid var(--rule);}
+    .meth-row:last-child{border-bottom:none;}
+    .meth-label{padding:10px 14px;font-size:12px;font-weight:700;line-height:1.45;border-right:1px solid var(--rule);display:flex;align-items:flex-start;}
+    .meth-label-green{color:var(--green);background:var(--green-bg);}
+    .meth-label-amber{color:var(--amber);background:var(--amber-bg);}
+    .meth-label-red{color:var(--red);background:var(--red-bg);}
+    .meth-label-navy{color:var(--navy);background:var(--surface-alt);}
+    .meth-def{padding:10px 16px;font-size:13px;line-height:1.65;color:var(--mid);background:var(--surface);}
+    /* ── Disclaimer ────────────────────────────────────────────────────── */
     .disclaimer{margin-top:64px;border:1px solid var(--rule);border-radius:var(--radius-lg);overflow:hidden;}
     .disclaimer-header{background:var(--surface-alt);padding:16px 24px;border-bottom:1px solid var(--rule);display:flex;align-items:center;gap:10px;}
     .disclaimer-icon{width:16px;height:16px;color:var(--muted);}
@@ -1276,7 +1480,7 @@ function buildHtml(data, meta, restricted) {
     .disclaimer-body li{font-size:12.5px;line-height:1.7;color:var(--muted);}
     .disclaimer-body li strong{font-weight:600;color:var(--mid);}
     .site-footer{text-align:center;padding:32px 0 0;font-size:12px;color:var(--muted);letter-spacing:.08em;}
-    @media(max-width:760px){.page-wrap{padding:0 16px 60px;}.summary-cards{grid-template-columns:1fr 1fr;}.summary-cards.two-col{grid-template-columns:1fr;}.identity-grid{grid-template-columns:1fr;}.identity-cell{border-right:none;border-bottom:1px solid var(--rule);}.cfb-body{grid-template-columns:1fr;}.cfb-col{border-right:none;border-bottom:1px solid var(--rule);}}
+    @media(max-width:760px){.page-wrap{padding:0 16px 60px;}.summary-cards{grid-template-columns:1fr 1fr;}.summary-cards.two-col{grid-template-columns:1fr;}.identity-grid{grid-template-columns:1fr;}.identity-cell{border-right:none;border-bottom:1px solid var(--rule);}.cfb-body{grid-template-columns:1fr;}.cfb-col{border-right:none;border-bottom:1px solid var(--rule);}.meth-row{grid-template-columns:1fr;}.meth-label{border-right:none;border-bottom:1px solid var(--rule);}}
   </style>
 </head>
 <body>
@@ -1323,7 +1527,8 @@ function buildHtml(data, meta, restricted) {
         <div class="summary-card"><div class="sc-label">Weighted Mapping</div><div class="sc-value">${esc(pctWeighted)}</div></div>
         <div class="summary-card"><div class="sc-label">Limitations</div><div class="sc-value meta">${esc(limLabel)}</div></div>
       </div>
-      <div class="opinion-box">
+      ${buildMethodologyHtml(methodology)}
+      <div class="opinion-box" style="margin-top:16px;">
         <h3>Opinion</h3>
         <p>${esc(opinion)}</p>
         <div class="limitations-box">
@@ -1362,6 +1567,14 @@ function buildHtml(data, meta, restricted) {
   </div>
   <script>
     function toggleExcerpts(btn) {
+      const body = btn.nextElementSibling;
+      const chevron = btn.querySelector('.chevron');
+      const isOpen = body.classList.contains('open');
+      body.classList.toggle('open', !isOpen);
+      chevron.classList.toggle('open', !isOpen);
+      btn.setAttribute('aria-expanded', String(!isOpen));
+    }
+    function toggleMethodology(btn) {
       const body = btn.nextElementSibling;
       const chevron = btn.querySelector('.chevron');
       const isOpen = body.classList.contains('open');
