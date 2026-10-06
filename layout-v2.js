@@ -39,15 +39,17 @@ const arr = (x) => Array.isArray(x) ? x : (x == null ? [] : [x]);
 
 // Finds a quote inside text, ignoring case, spacing, punctuation and LaTeX
 // markup. Returns [start, end) in the original text, or null.
+const SUBSUP = { '₀':'0','₁':'1','₂':'2','₃':'3','₄':'4','₅':'5','₆':'6','₇':'7','₈':'8','₉':'9','⁰':'0','¹':'1','²':'2','³':'3','⁴':'4','⁵':'5','⁶':'6','⁷':'7','⁸':'8','⁹':'9' };
 function locate(text, quote) {
   const sig = [], map = [];
   const t = String(text ?? '');
   for (let i = 0; i < t.length; ) {
     if (t[i] === '\\' && /[A-Za-z]/.test(t[i + 1] || '')) { i++; while (i < t.length && /[A-Za-z]/.test(t[i])) i++; continue; }
-    if (/[A-Za-z0-9]/.test(t[i])) { sig.push(t[i].toLowerCase()); map.push(i); }
+    const ch = SUBSUP[t[i]] || t[i];
+    if (/[A-Za-z0-9]/.test(ch)) { sig.push(ch.toLowerCase()); map.push(i); }
     i++;
   }
-  const q = String(quote ?? '').replace(/\\[A-Za-z]+/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const q = String(quote ?? '').replace(/[₀-₉⁰¹²³⁴-⁹]/g, c => SUBSUP[c] || c).replace(/\\[A-Za-z]+/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
   if (q.length < 3) return null;
   const k = sig.join('').indexOf(q);
   if (k < 0) return null;
