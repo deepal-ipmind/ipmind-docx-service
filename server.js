@@ -1015,6 +1015,12 @@ app.get("/", (req, res) => {
   res.json({ status: "ok", service: "ipmind-docx-service" });
 });
 
+// Claim chart layout v2 (Word), sharing this file's helpers
+const buildDocumentV2 = require("./layout-v2-docx")({
+  docx: require("docx"), C, PG, PGL, safeStr, shade, solidBorder, noBorders, noBorder, emptyPara,
+  sectionHeading, claimBlock, makeHeader, makeFooter, disclaimerSection, restrictedNoticePage,
+});
+
 app.post("/generate", async (req, res) => {
   try {
     const body = req.body;
@@ -1026,7 +1032,8 @@ app.post("/generate", async (req, res) => {
       Standard:      req.query.standard || "",
     };
     const restricted = req.query.restricted === "true" || data.Restricted_Use === true;
-    const buf      = await buildDocument(data, meta, restricted);
+    const useV2    = (req.query.layout === "v2" || data.Layout === "v2") && !!data.Snapshot;
+    const buf      = useV2 ? await buildDocumentV2(data, meta, restricted) : await buildDocument(data, meta, restricted);
     const safeName = (data.Patent_Number || meta.Patent_Number || "report")
       .replace(/[^A-Za-z0-9_-]/g, "_");
     res.setHeader("Content-Type",
