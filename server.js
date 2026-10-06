@@ -7,6 +7,7 @@ const {
   TabStopType, TabStopPosition, PageBreak, PageOrientation, SectionType
 } = require("docx");
 
+const { buildHtmlV2 } = require("./layout-v2");   // claim chart layout v2 (HTML)
 const app  = express();
 app.use(express.json({ limit: "10mb" }));
 
@@ -632,7 +633,7 @@ function methodologyDocx(methodology, W = PGL.W) {
   function essStyle(label) {
     const l = (label || "").toLowerCase();
     if (l.includes("not essential") || l.includes("non-technical")) return { color: "8A0000", bg: "FDF0F0" };
-    if (l.includes("conditional") || l.includes("optional") || l.includes("profile sep"))   return { color: C.amberText, bg: C.amberBg };
+    if (l.includes("conditional"))   return { color: C.amberText, bg: C.amberBg };
     if (l.includes("essential"))     return { color: C.greenText,  bg: C.greenBg };
     return { color: C.navy, bg: C.surfaceAlt }; // implementation matter etc.
   }
@@ -1152,7 +1153,7 @@ function buildHtml(data, meta, restricted) {
   function essClasses(decision) {
     const d = (decision || "").toLowerCase();
     if (d.includes("not essential"))  return { card: "", value: "red", dot: "dot-red", verdict: "red", badge: "badge-red" };
-    if (d.includes("conditional") || d.includes("optional") || d.includes("profile sep"))    return { card: "highlight", value: "amber", dot: "dot-amber", verdict: "amber", badge: "badge-amber" };
+    if (d.includes("conditional"))    return { card: "highlight", value: "amber", dot: "dot-amber", verdict: "amber", badge: "badge-amber" };
     if (d.includes("essential"))      return { card: "highlight-green", value: "green", dot: "dot-green", verdict: "green", badge: "badge-green" };
     return { card: "highlight", value: "amber", dot: "dot-amber", verdict: "amber", badge: "badge-amber" };
   }
@@ -1175,7 +1176,7 @@ function buildHtml(data, meta, restricted) {
   function essLabelClass(label) {
     const l = (label || "").toLowerCase();
     if (l.includes("not essential") || l.includes("non-technical")) return "meth-label-red";
-    if (l.includes("conditional") || l.includes("optional") || l.includes("profile sep"))   return "meth-label-amber";
+    if (l.includes("conditional"))   return "meth-label-amber";
     if (l.includes("essential"))     return "meth-label-green";
     return "meth-label-navy"; // implementation matter etc.
   }
@@ -1601,7 +1602,9 @@ app.post("/generate-html", (req, res) => {
       Owner:         req.query.owner    || "",
       Standard:      req.query.standard || "",
     };
-    const html = buildHtml(data, meta, req.query.restricted === "true" || data.Restricted_Use === true);
+    const restrictedHtml = req.query.restricted === "true" || data.Restricted_Use === true;
+    const useV2 = (req.query.layout === "v2" || data.Layout === "v2") && !!data.Snapshot;
+    const html = useV2 ? buildHtmlV2(data, meta, restrictedHtml) : buildHtml(data, meta, restrictedHtml);
     const safeName = (data.Patent_Number || meta.Patent_Number || "report")
       .replace(/[^A-Za-z0-9_-]/g, "_");
     res.json({
@@ -1609,6 +1612,7 @@ app.post("/generate-html", (req, res) => {
       filename: safeName + "_report.html",
       patent:   data.Patent_Number || meta.Patent_Number || "",
       claim:    data.Claim_Number  || "",
+      layout:   useV2 ? "v2" : "v1",
       features: (data.Claim_Charts || []).length,
       excerpts_total: (data.Claim_Charts || []).reduce((s, c) => s + (c.Cited_Excerpts || []).length, 0),
     });
