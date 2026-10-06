@@ -625,14 +625,14 @@ function methodologyDocx(methodology, W = PGL.W) {
   function disclosureStyle(label) {
     const l = (label || "").toLowerCase();
     if (l.includes("not disclosed"))                         return { color: "8A0000", bg: "FDF0F0" };
-    if (l.includes("explicitly") || l.includes("implied"))  return { color: C.greenText, bg: C.greenBg };
+    if (l.includes("explicitly") || l.includes("implied") || l.includes("implicitly"))  return { color: C.greenText, bg: C.greenBg };
     return { color: C.amberText, bg: C.amberBg }; // partial, functional equivalence
   }
 
   function essStyle(label) {
     const l = (label || "").toLowerCase();
     if (l.includes("not essential") || l.includes("non-technical")) return { color: "8A0000", bg: "FDF0F0" };
-    if (l.includes("conditional"))   return { color: C.amberText, bg: C.amberBg };
+    if (l.includes("conditional") || l.includes("optional") || l.includes("profile sep"))   return { color: C.amberText, bg: C.amberBg };
     if (l.includes("essential"))     return { color: C.greenText,  bg: C.greenBg };
     return { color: C.navy, bg: C.surfaceAlt }; // implementation matter etc.
   }
@@ -781,7 +781,7 @@ async function buildDocument(data, meta, restricted) {
   const patentNumber  = safeStr(data.Patent_Number || meta.Patent_Number || "Unknown");
   const title         = safeStr(data.Title         || meta.Title         || "Patent Analysis Report");
   const owner         = safeStr(data.Owner         || meta.Owner         || "");
-  const standard      = safeStr(data.Standard      || meta.Standard      || "");
+  const standard      = safeStr((data.Standard      || meta.Standard      || "") + (data.Standard_Edition ? " \u2014 " + data.Standard_Edition : ""));
   const claimNumber   = safeStr(data.Claim_Number  || "");
   const claimText     = safeStr(data.Claim         || "");
   const claimCategory = safeStr(data.Claim_Category|| "");
@@ -1059,7 +1059,7 @@ function buildHtml(data, meta, restricted) {
   const patentNumber  = safeStr(data.Patent_Number  || meta.Patent_Number  || "");
   const title         = safeStr(data.Title          || meta.Title          || "");
   const owner         = safeStr(data.Owner          || meta.Owner          || "");
-  const standard      = safeStr(data.Standard       || meta.Standard       || "");
+  const standard      = safeStr((data.Standard       || meta.Standard       || "") + (data.Standard_Edition ? " \u2014 " + data.Standard_Edition : ""));
   const claimNumber   = safeStr(data.Claim_Number   || "");
   const claimText     = safeStr(data.Claim          || "");
   const claimCategory = safeStr(data.Claim_Category || "");
@@ -1152,7 +1152,7 @@ function buildHtml(data, meta, restricted) {
   function essClasses(decision) {
     const d = (decision || "").toLowerCase();
     if (d.includes("not essential"))  return { card: "", value: "red", dot: "dot-red", verdict: "red", badge: "badge-red" };
-    if (d.includes("conditional"))    return { card: "highlight", value: "amber", dot: "dot-amber", verdict: "amber", badge: "badge-amber" };
+    if (d.includes("conditional") || d.includes("optional") || d.includes("profile sep"))    return { card: "highlight", value: "amber", dot: "dot-amber", verdict: "amber", badge: "badge-amber" };
     if (d.includes("essential"))      return { card: "highlight-green", value: "green", dot: "dot-green", verdict: "green", badge: "badge-green" };
     return { card: "highlight", value: "amber", dot: "dot-amber", verdict: "amber", badge: "badge-amber" };
   }
@@ -1160,7 +1160,7 @@ function buildHtml(data, meta, restricted) {
   function disclosureClasses(disclosure) {
     const d = (disclosure || "").toLowerCase();
     if (d.includes("not disclosed"))  return { dot: "dot-red",   verdict: "red",   badge: "badge-red"   };
-    if (d.includes("explicitly") || d.includes("implied")) return { dot: "dot-green", verdict: "green", badge: "badge-green" };
+    if (d.includes("explicitly") || d.includes("implied") || d.includes("implicitly")) return { dot: "dot-green", verdict: "green", badge: "badge-green" };
     return { dot: "dot-amber", verdict: "amber", badge: "badge-amber" };
   }
 
@@ -1168,14 +1168,14 @@ function buildHtml(data, meta, restricted) {
   function disclosureLabelClass(label) {
     const l = (label || "").toLowerCase();
     if (l.includes("not disclosed"))                        return "meth-label-red";
-    if (l.includes("explicitly") || l.includes("implied")) return "meth-label-green";
+    if (l.includes("explicitly") || l.includes("implied") || l.includes("implicitly")) return "meth-label-green";
     return "meth-label-amber"; // partial, functional equivalence
   }
 
   function essLabelClass(label) {
     const l = (label || "").toLowerCase();
     if (l.includes("not essential") || l.includes("non-technical")) return "meth-label-red";
-    if (l.includes("conditional"))   return "meth-label-amber";
+    if (l.includes("conditional") || l.includes("optional") || l.includes("profile sep"))   return "meth-label-amber";
     if (l.includes("essential"))     return "meth-label-green";
     return "meth-label-navy"; // implementation matter etc.
   }
