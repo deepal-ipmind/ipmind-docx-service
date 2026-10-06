@@ -133,11 +133,11 @@ module.exports = function makeBuildDocumentV2(h) {
     // Gaps and conditions
     s1.push(sub("Gaps and conditions"));
     const G = arr(snap.gaps_and_conditions);
-    const gk = { Gap: "red", Equivalence: "amber", Condition: "green", Verify: "amber", "Non-required": "red", Product: "amber" };
+    const gk = { Gap: "red", Equivalence: "amber", Construction: "amber", Condition: "green", Verify: "amber", "Non-required": "red", Product: "amber" };
     const gw = [1700, PG.W - 1700 - 1500, 1500];
     const gRows = [];
     if (!G.some(g => g.type === "Gap")) gRows.push(["Gap", "None", ""]);
-    for (const g of G) gRows.push([g.type, g.type === "Condition" && arr(g.flags).length ? "Enabling flag: " + arr(g.flags).join(" / ") : g.text, g.feature ? "Feature " + g.feature : ""]);
+    for (const g of G) gRows.push([g.type, g.type === "Condition" && arr(g.flags).length ? "Enabling flag: " + arr(g.flags).join(" / ") : (g.type === "Construction" && g.claim_words ? `“${g.claim_words}”: read broadly, ${g.adopted_result}; read narrowly, ${g.narrower_result}` : g.text), g.feature ? "Feature " + g.feature : ""]);
     s1.push(table(PG.W, gw, gRows.map(([ty, tx, f]) => new TableRow({ children: [
       cell(P(badge(ty, gk[ty] || "amber"), { spacing: { after: 0 } }), gw[0]), cell(P(T(tx), { spacing: { after: 0 } }), gw[1]),
       cell(P(T(f, { size: 17 }), { spacing: { after: 0 } }), gw[2]) ] }))));
@@ -196,7 +196,12 @@ module.exports = function makeBuildDocumentV2(h) {
       }
       // caveats
       const verify = arr(dec.Verify), nf = colored.filter(x => x.el.status === "Not found");
-      if (verify.length || nf.length) s2.push(table(PGL.W, [PGL.W], [new TableRow({ children: [cell([
+      const cp = (dec.Construction && dec.Construction.claim_words) ? dec.Construction : null;
+      if (verify.length || nf.length || cp) s2.push(table(PGL.W, [PGL.W], [new TableRow({ children: [cell([
+        ...(cp ? [P(T("Construction point", { bold: true, color: "8A5A00" })), P(T(`“${cp.claim_words}”`, { size: 18 })),
+                  P([T("Adopted (broadest) reading: ", { bold: true, size: 18 }), T(`${cp.adopted_reading} → ${cp.adopted_result}`, { size: 18 })]),
+                  P([T("Narrower reading: ", { bold: true, size: 18 }), T(`${cp.narrower_reading} → ${cp.narrower_result}`, { size: 18 })]),
+                  P(T("The patent's description may resolve which reading applies.", { size: 17, color: C.mid }))] : []),
         ...(verify.length ? [P(T("To verify", { bold: true, color: "8A5A00" })), ...verify.map(v => P(T(v, { size: 18 })))] : []),
         ...(nf.length ? [P(T("Not found in the standard", { bold: true, color: "8A0000" })), ...nf.map(x => P(T(x.el.element_text, { size: 18 })))] : []) ], PGL.W,
         { shading: shade("FDF5E0"), borders: { top: noBorder, bottom: noBorder, right: noBorder, left: solidBorder("E8C96A", 12) } })] })]));
@@ -223,7 +228,7 @@ module.exports = function makeBuildDocumentV2(h) {
     if (lim) { const ll = lim.split("\n")[0].trim(), lb = lim.split("\n").slice(1).join("\n").trim();
       s3.push(sub("Limitations" + (ll ? ": " + ll : ""))); if (lb) s3.push(P(T(lb, { color: C.mid }))); }
     const M = data.Methodology || {};
-    const terms = [...arr(M.disclosure_categories), ...arr(M.essentiality_tiers)];
+    const terms = [{ label: "Reading of the claims", definition: "Claims are read on their own wording, without the patent's description, using the broadest technically sensible reading of the claim language. Where a narrower reasonable reading would change a result, the chart marks a Construction point with both readings; the description may resolve it." }, ...arr(M.disclosure_categories), ...arr(M.essentiality_tiers)];
     const metrics = Object.entries(M.universal_metrics || {});
     if (terms.length || metrics.length) {
       s3.push(sub("Key to terms"));
