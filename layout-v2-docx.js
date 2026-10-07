@@ -106,10 +106,11 @@ module.exports = function makeBuildDocumentV2(h) {
     s1.push(table(PG.W, [third, third, PG.W - 2 * third], [
       new TableRow({ children: [cell([
         new Paragraph({ children: [new TextRun({ text: vLabel, font: "Georgia", size: 30, bold: true, color: vText })], spacing: { after: 80 } }),
-        ...(verdict.bottom_line ? [P(T(verdict.bottom_line, { size: 20 }), { spacing: { after: 0 } })] : []) ], PG.W, { columnSpan: 3, shading: shade(vFill), borders: noBorders })] }),
+        ...(verdict.bottom_line ? [P(T((() => { const b = String(verdict.bottom_line).replace(/^\s*(essential,\s*(core|optional)\s+in\s+[^:]{2,40}|implementation matter|not essential)\s*:\s*/i, ''); return b ? b[0].toUpperCase() + b.slice(1) : ''; })(), { size: 20 }), { spacing: { after: 0 } })] : []) ], PG.W, { columnSpan: 3, shading: shade(vFill), borders: noBorders })] }),
       new TableRow({ children: [
-        [`${verdict.percentage_mapped ?? "—"}%`, "Mapped"], [`${verdict.weighted_percentage_mapped ?? "—"}%`, "Evidence strength"],
-        [`${verdict.features_aligned ?? "—"}/${verdict.features_technical ?? "—"}`, "Features aligned"] ].map(([v, l], k) =>
+        [`${verdict.features_aligned ?? "—"}/${verdict.features_technical ?? "—"}`, "Features aligned"],
+        [(() => { const n = Number(verdict.weighted_percentage_mapped); return Number.isFinite(n) ? (n >= 85 ? "High" : n >= 70 ? "Moderate" : "Low") : "—"; })(), "Evidence strength"],
+        ["", ""] ].map(([v, l], k) =>
         cell([P(T(v, { size: 32, bold: true, color: C.navy }), { spacing: { after: 0 } }), P(T(l, { size: 16, color: C.mid }), { spacing: { after: 0 } })],
              k < 2 ? third : PG.W - 2 * third, { shading: shade(vFill), borders: noBorders })) }),
     ]));
@@ -204,9 +205,14 @@ module.exports = function makeBuildDocumentV2(h) {
       if (verify.length || nf.length || cp) s2.push(table(PGL.W, [PGL.W], [new TableRow({ children: [cell([
         ...(cp ? [P(T(`Construction point · “${cp.claim_words}”`, { bold: true, color: "8A5A00" })),
                   ...(cp.question ? [P(T(cp.question, { bold: true, size: 18 }))] : []),
-                  P([T("Broad reading (adopted): ", { bold: true, size: 18, color: "8A5A00" }), T(`${cp.adopted_reading} `, { size: 18 }), T(`→ ${cp.adopted_result}`, { bold: true, size: 18 })]),
-                  P([T("Narrower reading: ", { bold: true, size: 18, color: "8A5A00" }), T(`${cp.narrower_reading} `, { size: 18 }), T(`→ ${cp.narrower_result}`, { bold: true, size: 18 })]),
-                  P(T("Claims are read without the patent's description, which may settle the point.", { size: 17, color: C.mid }))] : []),
+                  (() => { const half = Math.floor((PGL.W - 480) / 2);
+                    const col = (label, reading, result, adopted) => cell([
+                      P([T(label.toUpperCase(), { bold: true, size: 15, color: C.mid }), ...(adopted ? [T("   adopted", { bold: true, size: 15, color: "1A6B4A" })] : [])], { spacing: { after: 60 } }),
+                      P(T(reading, { size: 18 }), { spacing: { after: 60 } }),
+                      P([T("→ ", { size: 18, color: C.mid }), T(result, { bold: true, size: 18, color: adopted ? "1A6B4A" : "8A5A00" })], { spacing: { after: 0 } })],
+                      half, { shading: shade("FFFFFF"), borders: { top: solidBorder(adopted ? "9FD1B6" : "E8C96A", 6), bottom: solidBorder(adopted ? "9FD1B6" : "E8C96A", 6), left: solidBorder(adopted ? "1A6B4A" : "E8C96A", adopted ? 18 : 6), right: solidBorder(adopted ? "9FD1B6" : "E8C96A", 6) } });
+                    return table(half * 2, [half, half], [new TableRow({ children: [col("Broad reading", cp.adopted_reading, cp.adopted_result, true), col("Narrower reading", cp.narrower_reading, cp.narrower_result, false)] })]); })(),
+                  P(T("Claims are read without the patent's description, which may settle the point.", { size: 17, color: C.mid }), { spacing: { before: 80 } })] : []),
         ...(verify.length ? [P(T("To verify", { bold: true, color: "8A5A00" })), ...verify.map(v => P(T(v, { size: 18 })))] : []),
         ...(nf.length ? [P(T("Not found in the standard", { bold: true, color: "8A0000" })), ...nf.map(x => P(T(x.el.element_text, { size: 18 })))] : []) ], PGL.W,
         { shading: shade("FDF5E0"), borders: { top: noBorder, bottom: noBorder, right: noBorder, left: solidBorder("E8C96A", 12) } })] })]));
@@ -233,7 +239,7 @@ module.exports = function makeBuildDocumentV2(h) {
     if (lim) { const ll = lim.split("\n")[0].trim(), lb = lim.split("\n").slice(1).join("\n").trim();
       s3.push(sub("Limitations" + (ll ? ": " + ll : ""))); if (lb) s3.push(P(T(lb, { color: C.mid }))); }
     const M = data.Methodology || {};
-    const terms = [{ label: "Reading of the claims", definition: "Claims are read on their own wording, without the patent's description, using the broadest technically sensible reading of the claim language. Where a narrower reasonable reading would change a result, the chart marks a Construction point with both readings; the description may resolve it." }, ...arr(M.disclosure_categories), ...arr(M.essentiality_tiers)];
+    const terms = [{ label: "Evidence strength", definition: "High where most features are stated directly in the standard; Moderate where several rest on necessary implication, a point to verify, or equivalence; Low where the mapping depends substantially on these or features are not disclosed. (Weighted mapping of at least 85%, 70–84%, below 70%.)" }, { label: "Reading of the claims", definition: "Claims are read on their own wording, without the patent's description, using the broadest technically sensible reading of the claim language. Where a narrower reasonable reading would change a result, the chart marks a Construction point with both readings; the description may resolve it." }, ...arr(M.disclosure_categories), ...arr(M.essentiality_tiers)];
     const metrics = Object.entries(M.universal_metrics || {});
     if (terms.length || metrics.length) {
       s3.push(sub("Key to terms"));
