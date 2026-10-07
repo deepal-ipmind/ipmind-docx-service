@@ -138,7 +138,7 @@ module.exports = function makeBuildDocumentV2(h) {
     const gw = [1700, PG.W - 1700 - 1500, 1500];
     const gRows = [];
     if (!G.some(g => g.type === "Gap")) gRows.push(["Gap", "None", ""]);
-    for (const g of G) gRows.push([g.type, g.type === "Condition" && arr(g.flags).length ? (arr(g.tools).length ? `${g.text} (${arr(g.flags).join(" / ")})` : "Only when this enabling flag is set: " + arr(g.flags).join(" / ")) : (g.type === "Construction" && g.claim_words ? `${g.question || ("How should “" + g.claim_words + "” be read?")} Broad reading: ${g.adopted_result}. Narrower: ${g.narrower_result}.` : g.text), g.feature ? "Feature " + g.feature : ""]);
+    for (const g of G) gRows.push([g.type, g.type === "Condition" && arr(g.flags).length ? (arr(g.tools).length ? `${g.text} (${arr(g.flags).join(" / ")})` : "Only when this enabling flag is set: " + arr(g.flags).join(" / ")) : (g.type === "Construction" && g.claim_words ? `${g.question || ("How should “" + g.claim_words + "” be read?")} Adopted: ${g.adopted_result}. Alternative: ${g.narrower_result}.` : g.text), g.feature ? "Feature " + g.feature : ""]);
     s1.push(table(PG.W, gw, gRows.map(([ty, tx, f]) => new TableRow({ children: [
       cell(P(badge(ty, gk[ty] || "amber"), { spacing: { after: 0 } }), gw[0]), cell(P(T(tx), { spacing: { after: 0 } }), gw[1]),
       cell(P(T(f, { size: 17 }), { spacing: { after: 0 } }), gw[2]) ] }))));
@@ -158,7 +158,7 @@ module.exports = function makeBuildDocumentV2(h) {
         cell(P(T(s.short_label || c?.Claim_Feature?.Text || ""), { spacing: { after: 0 } }), sw[1]),
         cell(P(T(s.maps_to || "", { size: 17, color: C.mid }), { spacing: { after: 0 } }), sw[2]),
         cell([P(badge(e.label, e.kind), { spacing: { after: 0 } }), ...(flags.length ? [P([...(tools.length ? [T("Needs " + tools.join(" and ") + " ", { size: 15, color: C.mid })] : []), T(flags.join(" / "), { size: 15, font: "Courier New", color: C.mid })], { spacing: { after: 0 } })] : []),
-              ...(cpS ? [P(T(`Narrower reading: ${cpS.narrower_result}`, { size: 15, color: "8A5A00" }), { spacing: { after: 0 } })] : [])], sw[3]),
+              ...(cpS ? [P(T(`Alternative reading: ${cpS.narrower_result}`, { size: 15, color: "8A5A00" }), { spacing: { after: 0 } })] : [])], sw[3]),
         cell([...(caveatOf(s.gap, dec.Disclosure) || !cpS ? [P(T(caveatOf(s.gap, dec.Disclosure) || "None", { size: 17, color: caveatOf(s.gap, dec.Disclosure) ? "8A5A00" : C.muted }), { spacing: { after: 0 } })] : []),
               ...(cpS ? [P([...badge("Construction", "amber"), T(cpS.question || `“${cpS.claim_words}” could be read more narrowly`, { size: 16 })], { spacing: { after: 0 } })] : [])], sw[4]) ] });
     })]));
@@ -211,7 +211,7 @@ module.exports = function makeBuildDocumentV2(h) {
                       P(T(reading, { size: 18 }), { spacing: { after: 60 } }),
                       P([T("→ ", { size: 18, color: C.mid }), T(result, { bold: true, size: 18, color: adopted ? "1A6B4A" : "8A5A00" })], { spacing: { after: 0 } })],
                       half, { shading: shade("FFFFFF"), borders: { top: solidBorder(adopted ? "9FD1B6" : "E8C96A", 6), bottom: solidBorder(adopted ? "9FD1B6" : "E8C96A", 6), left: solidBorder(adopted ? "1A6B4A" : "E8C96A", adopted ? 18 : 6), right: solidBorder(adopted ? "9FD1B6" : "E8C96A", 6) } });
-                    return table(half * 2, [half, half], [new TableRow({ children: [col("Broad reading", cp.adopted_reading, cp.adopted_result, true), col("Narrower reading", cp.narrower_reading, cp.narrower_result, false)] })]); })(),
+                    return table(half * 2, [half, half], [new TableRow({ children: [col("Adopted reading", cp.adopted_reading, cp.adopted_result, true), col("Alternative reading", cp.narrower_reading, cp.narrower_result, false)] })]); })(),
                   P(T("Claims are read without the patent's description, which may settle the point.", { size: 17, color: C.mid }), { spacing: { before: 80 } })] : []),
         ...(verify.length ? [P(T("To verify", { bold: true, color: "8A5A00" })), ...verify.map(v => P(T(v, { size: 18 })))] : []),
         ...(nf.length ? [P(T("Not found in the standard", { bold: true, color: "8A0000" })), ...nf.map(x => P(T(x.el.element_text, { size: 18 })))] : []) ], PGL.W,
@@ -239,7 +239,7 @@ module.exports = function makeBuildDocumentV2(h) {
     if (lim) { const ll = lim.split("\n")[0].trim(), lb = lim.split("\n").slice(1).join("\n").trim();
       s3.push(sub("Limitations" + (ll ? ": " + ll : ""))); if (lb) s3.push(P(T(lb, { color: C.mid }))); }
     const M = data.Methodology || {};
-    const terms = [{ label: "Evidence strength", definition: "High where most features are stated directly in the standard; Moderate where several rest on necessary implication, a point to verify, or equivalence; Low where the mapping depends substantially on these or features are not disclosed. (Weighted mapping of at least 85%, 70–84%, below 70%.)" }, { label: "Reading of the claims", definition: "Claims are read on their own wording, without the patent's description, using the broadest technically sensible reading of the claim language. Where a narrower reasonable reading would change a result, the chart marks a Construction point with both readings; the description may resolve it." }, ...arr(M.disclosure_categories), ...arr(M.essentiality_tiers)];
+    const terms = [{ label: "Evidence strength", definition: "High where most features are stated directly in the standard; Moderate where several rest on necessary implication, a point to verify, or equivalence; Low where the mapping depends substantially on these or features are not disclosed. (Weighted mapping of at least 85%, 70–84%, below 70%.)" }, { label: "Reading of the claims", definition: "Claims are read on their own wording, without the patent's description. Where claim words can reasonably be read more than one way, the chart adopts the reading under which the feature maps onto the standard and shows the alternative reading and its result as a Construction point; the description may resolve which applies." }, ...arr(M.disclosure_categories), ...arr(M.essentiality_tiers)];
     const metrics = Object.entries(M.universal_metrics || {});
     if (terms.length || metrics.length) {
       s3.push(sub("Key to terms"));

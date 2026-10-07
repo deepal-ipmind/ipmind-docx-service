@@ -172,7 +172,7 @@ function buildHtmlV2(data, meta, restricted) {
   for (const g of G) {
     let txt = esc(g.text);
     if (g.type === 'Condition' && arr(g.flags).length) txt = (arr(g.tools).length ? esc(g.text) + ' ' : 'Only when this enabling flag is set: ') + '(' + arr(g.flags).map(f => `<code>${esc(f)}</code>`).join(' / ') + ')';
-    if (g.type === 'Construction' && g.claim_words) txt = `${esc(g.question || ('How should “' + g.claim_words + '” be read?'))}<span class="cp-res">Broad reading: ${esc(g.adopted_result)} · Narrower: ${esc(g.narrower_result)}</span>`;
+    if (g.type === 'Construction' && g.claim_words) txt = `${esc(g.question || ('How should “' + g.claim_words + '” be read?'))}<span class="cp-res">Adopted: ${esc(g.adopted_result)} · Alternative: ${esc(g.narrower_result)}</span>`;
     gapRows.push(`<li><span class="tag ${tagCls[g.type] || 'ver'}">${esc(g.type)}</span>${txt}${g.feature ? ' ' + flink(g.feature) : ''}</li>`);
   }
 
@@ -189,7 +189,7 @@ function buildHtmlV2(data, meta, restricted) {
     const cpLine = cpS ? `<div class="cp-line"><span class="tag ver">Construction</span>${esc(cpS.question || ('“' + cpS.claim_words + '” could be read more narrowly'))}</div>` : '';
     const gap = (cav ? `<span class="flag">${esc(cav)}</span>` : (cpS ? '' : '<span class="none">None</span>')) + cpLine;
     return `<tr><th scope="row"><a href="#f${esc(i)}">${esc(i)}</a></th><td>${esc(s.short_label || c?.Claim_Feature?.Text || '')}</td><td class="maps">${esc(s.maps_to || '')}</td>` +
-      `<td><span class="ess ess-${e.kind}">${esc(e.label)}</span>${flags.length ? `<div class="cond-w">${tools.length ? 'Needs ' + esc(tools.join(' and ')) + ' ' : ''}<code>${esc(flags.join(' / '))}</code></div>` : ''}${cpS ? `<div class="cp-alt">Narrower reading: ${esc(cpS.narrower_result)}</div>` : ''}</td><td>${gap}</td></tr>`;
+      `<td><span class="ess ess-${e.kind}">${esc(e.label)}</span>${flags.length ? `<div class="cond-w">${tools.length ? 'Needs ' + esc(tools.join(' and ')) + ' ' : ''}<code>${esc(flags.join(' / '))}</code></div>` : ''}${cpS ? `<div class="cp-alt">Alternative reading: ${esc(cpS.narrower_result)}</div>` : ''}</td><td>${gap}</td></tr>`;
   }).join('');
 
   // detailed chart
@@ -231,7 +231,7 @@ function buildHtmlV2(data, meta, restricted) {
     const essK = (r) => /^\s*(essential\s*\(\s*)?core/i.test(String(r)) ? 'ess-core' : /^\s*(essential\s*\(\s*)?optional/i.test(String(r)) ? 'ess-opt' : 'ess-impl';
     const resParts = (r) => { const m = String(r || '').match(/^([^:]+):\s*(.+)$/); return m ? [m[1].trim(), m[2].trim()] : [String(r || ''), '']; };
     const opt = (label, reading, result, adopted) => { const [lab, cond] = resParts(result); return `<div class="cp-opt${adopted ? ' cp-adopted' : ''}"><div class="cp-opt-h"><span>${label}</span>${adopted ? '<span class="cp-tick">adopted</span>' : ''}</div><p>${esc(reading)}</p><div class="cp-arrow">→ <span class="ess ${essK(lab)}">${esc(lab)}</span>${cond ? `<span class="cp-cond">${esc(cond)}</span>` : ''}</div></div>`; };
-    const cpHtml = cp ? `<div class="cav-h">Construction point · “${esc(cp.claim_words)}”</div>${cp.question ? `<p class="cp-q">${esc(cp.question)}</p>` : ''}<div class="cp-grid">${opt('Broad reading', cp.adopted_reading, cp.adopted_result, true)}${opt('Narrower reading', cp.narrower_reading, cp.narrower_result, false)}</div><p class="cav-note">Claims are read without the patent's description, which may settle the point.</p>` : '';
+    const cpHtml = cp ? `<div class="cav-h">Construction point · “${esc(cp.claim_words)}”</div>${cp.question ? `<p class="cp-q">${esc(cp.question)}</p>` : ''}<div class="cp-grid">${opt('Adopted reading', cp.adopted_reading, cp.adopted_result, true)}${opt('Alternative reading', cp.narrower_reading, cp.narrower_result, false)}</div><p class="cav-note">Claims are read without the patent's description, which may settle the point.</p>` : '';
     const caveat = (verify.length || notFound.length || cp) ? `<div class="caveat">${cpHtml}${verify.length ? `<div class="cav-h">To verify</div>${verify.map(v => `<p>${esc(v)}</p>`).join('')}` : ''}${notFound.length ? `<div class="cav-h red">Not found in the standard</div>${notFound.map(x => `<p>${esc(x.el.element_text)}</p>`).join('')}` : ''}</div>` : '';
     const essLine = s.essentiality_line || '';
     const excerptHtml = (x) => {
@@ -260,7 +260,7 @@ function buildHtmlV2(data, meta, restricted) {
   const limLabel = lim.split('\n')[0].trim();
   const limBody = lim.split('\n').slice(1).join('\n').trim();
   const M = data.Methodology || {};
-  const terms = `<dt>Evidence strength</dt><dd>${BAND_NOTE}</dd><dt>Reading of the claims</dt><dd>Claims are read on their own wording, without the patent's description, using the broadest technically sensible reading of the claim language. Where a narrower reasonable reading would change a result, the chart marks a Construction point with both readings; the description may resolve it.</dd>` + [...arr(M.disclosure_categories), ...arr(M.essentiality_tiers)].map(t => `<dt>${esc(t.label)}</dt><dd>${esc(t.definition)}</dd>`).join('') +
+  const terms = `<dt>Evidence strength</dt><dd>${BAND_NOTE}</dd><dt>Reading of the claims</dt><dd>Claims are read on their own wording, without the patent's description. Where claim words can reasonably be read more than one way, the chart adopts the reading under which the feature maps onto the standard and shows the alternative reading and its result as a Construction point; the description may resolve which applies.</dd>` + [...arr(M.disclosure_categories), ...arr(M.essentiality_tiers)].map(t => `<dt>${esc(t.label)}</dt><dd>${esc(t.definition)}</dd>`).join('') +
     Object.entries(M.universal_metrics || {}).map(([k, v]) => `<dt>${esc({ percentage_mapped: 'Mapped', weighted_mapping: 'Evidence strength (weighted mapping)' }[k] || k)}</dt><dd>${esc(v)}</dd>`).join('');
 
   return `<!DOCTYPE html>
