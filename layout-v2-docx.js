@@ -137,7 +137,7 @@ module.exports = function makeBuildDocumentV2(h) {
     const gw = [1700, PG.W - 1700 - 1500, 1500];
     const gRows = [];
     if (!G.some(g => g.type === "Gap")) gRows.push(["Gap", "None", ""]);
-    for (const g of G) gRows.push([g.type, g.type === "Condition" && arr(g.flags).length ? "Enabling flag: " + arr(g.flags).join(" / ") : (g.type === "Construction" && g.claim_words ? `“${g.claim_words}”: read broadly, ${g.adopted_result}; read narrowly, ${g.narrower_result}` : g.text), g.feature ? "Feature " + g.feature : ""]);
+    for (const g of G) gRows.push([g.type, g.type === "Condition" && arr(g.flags).length ? (arr(g.tools).length ? `${g.text} (${arr(g.flags).join(" / ")})` : "Only when this enabling flag is set: " + arr(g.flags).join(" / ")) : (g.type === "Construction" && g.claim_words ? `${g.question || ("How should “" + g.claim_words + "” be read?")} Broad reading: ${g.adopted_result}. Narrower: ${g.narrower_result}.` : g.text), g.feature ? "Feature " + g.feature : ""]);
     s1.push(table(PG.W, gw, gRows.map(([ty, tx, f]) => new TableRow({ children: [
       cell(P(badge(ty, gk[ty] || "amber"), { spacing: { after: 0 } }), gw[0]), cell(P(T(tx), { spacing: { after: 0 } }), gw[1]),
       cell(P(T(f, { size: 17 }), { spacing: { after: 0 } }), gw[2]) ] }))));
@@ -150,12 +150,16 @@ module.exports = function makeBuildDocumentV2(h) {
     s1.push(table(PG.W, sw, [headRow(["#", "Claim feature", "Maps to", "Essentiality", "Gap or caveat"], sw), ...charts.map(c => {
       const i = String(c?.Claim_Feature?.Index ?? ""), s = sumByIdx[i] || {}, dec = c.Decision || {}, e = essParts(dec.Essentiality_Classification);
       const flags = arr(dec.Gating_Flags);
+      const cpS = (dec.Construction && dec.Construction.claim_words) ? dec.Construction : null;
+      const tools = [...new Set(arr(dec.Condition_Tools).map(x => x && x.tool).filter(Boolean))];
       return new TableRow({ cantSplit: true, children: [
         cell(P(T(i, { bold: true }), { spacing: { after: 0 } }), sw[0]),
         cell(P(T(s.short_label || c?.Claim_Feature?.Text || ""), { spacing: { after: 0 } }), sw[1]),
         cell(P(T(s.maps_to || "", { size: 17, color: C.mid }), { spacing: { after: 0 } }), sw[2]),
-        cell([P(badge(e.label, e.kind), { spacing: { after: 0 } }), ...(flags.length ? [P(T(flags.join(" / "), { size: 15, font: "Courier New", color: C.mid }), { spacing: { after: 0 } })] : [])], sw[3]),
-        cell(P(T(caveatOf(s.gap, dec.Disclosure) || "None", { size: 17, color: caveatOf(s.gap, dec.Disclosure) ? "8A5A00" : C.muted }), { spacing: { after: 0 } }), sw[4]) ] });
+        cell([P(badge(e.label, e.kind), { spacing: { after: 0 } }), ...(flags.length ? [P([...(tools.length ? [T("Needs " + tools.join(" and ") + " ", { size: 15, color: C.mid })] : []), T(flags.join(" / "), { size: 15, font: "Courier New", color: C.mid })], { spacing: { after: 0 } })] : []),
+              ...(cpS ? [P(T(`Narrower reading: ${cpS.narrower_result}`, { size: 15, color: "8A5A00" }), { spacing: { after: 0 } })] : [])], sw[3]),
+        cell([...(caveatOf(s.gap, dec.Disclosure) || !cpS ? [P(T(caveatOf(s.gap, dec.Disclosure) || "None", { size: 17, color: caveatOf(s.gap, dec.Disclosure) ? "8A5A00" : C.muted }), { spacing: { after: 0 } })] : []),
+              ...(cpS ? [P([...badge("Construction", "amber"), T(cpS.question || `“${cpS.claim_words}” could be read more narrowly`, { size: 16 })], { spacing: { after: 0 } })] : [])], sw[4]) ] });
     })]));
 
     // ── Section 2: detailed claim chart (landscape) ──
@@ -198,10 +202,11 @@ module.exports = function makeBuildDocumentV2(h) {
       const verify = arr(dec.Verify), nf = colored.filter(x => x.el.status === "Not found");
       const cp = (dec.Construction && dec.Construction.claim_words) ? dec.Construction : null;
       if (verify.length || nf.length || cp) s2.push(table(PGL.W, [PGL.W], [new TableRow({ children: [cell([
-        ...(cp ? [P(T("Construction point", { bold: true, color: "8A5A00" })), P(T(`“${cp.claim_words}”`, { size: 18 })),
-                  P([T("Adopted (broadest) reading: ", { bold: true, size: 18 }), T(`${cp.adopted_reading} → ${cp.adopted_result}`, { size: 18 })]),
-                  P([T("Narrower reading: ", { bold: true, size: 18 }), T(`${cp.narrower_reading} → ${cp.narrower_result}`, { size: 18 })]),
-                  P(T("The patent's description may resolve which reading applies.", { size: 17, color: C.mid }))] : []),
+        ...(cp ? [P(T(`Construction point · “${cp.claim_words}”`, { bold: true, color: "8A5A00" })),
+                  ...(cp.question ? [P(T(cp.question, { bold: true, size: 18 }))] : []),
+                  P([T("Broad reading (adopted): ", { bold: true, size: 18, color: "8A5A00" }), T(`${cp.adopted_reading} `, { size: 18 }), T(`→ ${cp.adopted_result}`, { bold: true, size: 18 })]),
+                  P([T("Narrower reading: ", { bold: true, size: 18, color: "8A5A00" }), T(`${cp.narrower_reading} `, { size: 18 }), T(`→ ${cp.narrower_result}`, { bold: true, size: 18 })]),
+                  P(T("Claims are read without the patent's description, which may settle the point.", { size: 17, color: C.mid }))] : []),
         ...(verify.length ? [P(T("To verify", { bold: true, color: "8A5A00" })), ...verify.map(v => P(T(v, { size: 18 })))] : []),
         ...(nf.length ? [P(T("Not found in the standard", { bold: true, color: "8A0000" })), ...nf.map(x => P(T(x.el.element_text, { size: 18 })))] : []) ], PGL.W,
         { shading: shade("FDF5E0"), borders: { top: noBorder, bottom: noBorder, right: noBorder, left: solidBorder("E8C96A", 12) } })] })]));
