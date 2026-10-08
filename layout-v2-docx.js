@@ -148,13 +148,15 @@ module.exports = function makeBuildDocumentV2(h) {
                        T("If no: ", { bold: true, size: 17 }), T(p.if_alternative || `the claim would be ${decisive.get(f.idx)}`, { size: 17, color: C.mid })], { spacing: { after: 60 } }));
       }
     }
+    const jr = snap.joint_route || null;
+    if (jr && arr(jr.features).length) panel.push(P([T("Arguable route: ", { bold: true, size: 18, color: "8A5A00" }), T(((snap.plain || {}).route_note) || `if features ${arr(jr.features).join(" and ")} were all read the other way, the claim would be ${String(jr.verdict || "").toLowerCase()}.`, { size: 18 })], { spacing: { before: 80, after: 40 } }));
     s1.push(table(PG.W, [PG.W], [new TableRow({ children: [cell(panel, PG.W, { shading: shade(vFill) })] })]));
 
     // Summary mapping
     s1.push(...sectionHeading("Summary mapping"));
     s1.push(P(T("One row per claim feature, in the claim's own words. The full analysis and evidence for each is in the detailed claim chart.", { color: C.mid, size: 18 })));
     const rest = PG.W - 450;
-    const sw = [450, Math.round(rest * 0.36), Math.round(rest * 0.26), Math.round(rest * 0.12)]; sw.push(PG.W - sw.reduce((a, b) => a + b, 0));
+    const sw = [450, Math.round(rest * 0.31), Math.round(rest * 0.23), Math.round(rest * 0.14)]; sw.push(PG.W - sw.reduce((a, b) => a + b, 0));
     const caveatOf = (gap, disc) => gap && gap !== "None" ? gap : disc === "Not Disclosed" ? "Not disclosed in the standard" : disc === "Functionally Equivalent" ? "Relies on functional equivalence" : "";
     s1.push(table(PG.W, sw, [headRow(["#", "Claim feature", "Maps to", "Essentiality", "Gap or caveat"], sw), ...charts.map(c => {
       const i = String(c?.Claim_Feature?.Index ?? ""), s = sumByIdx[i] || {}, dec = c.Decision || {}, e = essParts(dec.Essentiality_Classification);
@@ -166,8 +168,9 @@ module.exports = function makeBuildDocumentV2(h) {
         cell(P(T(i, { bold: true }), { spacing: { after: 0 } }), sw[0]),
         cell(P(T(c?.Claim_Feature?.Text || s.short_label || "", { size: 18 }), { spacing: { after: 0 } }), sw[1]),
         cell(P(T(s.maps_to || "", { size: 17, color: C.mid }), { spacing: { after: 0 } }), sw[2]),
-        cell([P(badge(e.label, e.kind), { spacing: { after: 0 } }), ...(flags.length ? [P([...(tools.length ? [T("Needs " + tools.join(" and ") + " ", { size: 15, color: C.mid })] : []), T(flags.join(" / "), { size: 15, font: "Courier New", color: C.mid })], { spacing: { after: 0 } })] : [])], sw[3]),
-        cell([...(cav || !cpS ? [P(T(cav || "None", { size: 17, color: cav ? "8A5A00" : C.muted }), { spacing: { after: 0 } })] : []),
+        cell([P(badge(e.label, e.kind), { spacing: { after: 0 } })], sw[3]),
+        cell([...(cav || (!cpS && !flags.length) ? [P(T(cav || "None", { size: 17, color: cav ? "8A5A00" : C.muted }), { spacing: { after: 0 } })] : []),
+              ...(flags.length ? [P([...badge("Condition", "green"), T(" Needs " + (tools.length ? tools.join(" and ") + " " : ""), { size: 16, color: C.mid }), T("(" + flags.join(" / ") + ")", { size: 14, font: "Courier New", color: C.mid })], { spacing: { after: 0 } })] : []),
               ...(cpS ? [P([...badge("Decisive", "amber"), T(" " + ((plainDec[i] || {}).question || cpS.question || `How should “${cpS.claim_words}” be read?`), { size: 16 })], { spacing: { after: 0 } })] : [])], sw[4]) ] });
     })]));
 
@@ -225,9 +228,9 @@ module.exports = function makeBuildDocumentV2(h) {
         ...(verify.length ? [P(T("To verify", { bold: true, color: "8A5A00" })), ...verify.map(v => P(T(v, { size: 18 })))] : []),
         ...(nf.length ? [P(T("Not found in the standard", { bold: true, color: "8A0000" })), ...nf.map(x => P(T(x.el.element_text, { size: 18 })))] : []) ], PGL.W,
         { shading: shade("FDF5E0"), borders: { top: noBorder, bottom: noBorder, right: noBorder, left: solidBorder("E8C96A", 12) } })] })]));
-      if (s.essentiality_line) s2.push(P([T("Essentiality. ", { bold: true, color: C.navy }), T(s.essentiality_line, { color: C.mid })], { spacing: { before: 120, after: 80 } }));
       // reasoning
-      const rs = [["Interpretation", an.Interpretation], ["Opinion", an.Overall_Opinion],
+      const pb = dec.Practised_By || null;
+      const rs = [["Who practises it", pb ? `Decoder: ${pb.decoder || ""} Encoder (${pb.encoder_case || ""}): ${pb.encoder || ""}` : ""], ["Interpretation", an.Interpretation], ["Opinion", an.Overall_Opinion],
         ["Differences", an.Differences && !/^none\.?$/i.test(String(an.Differences).trim()) ? an.Differences : ""], ["Essentiality justification", dec.Justification]].filter(([, v]) => v);
       if (rs.length) { s2.push(new Paragraph({ children: [T("Reasoning", { bold: true, color: C.navy })], spacing: { before: 160, after: 60 } }));
         for (const [hh, v] of rs) s2.push(P([T(hh + ". ", { bold: true, size: 18, color: C.mid }), T(v, { size: 18, color: C.mid })])); }
