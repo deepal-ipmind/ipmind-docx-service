@@ -207,13 +207,13 @@ module.exports = function makeBuildDocumentV2(h) {
           cell(P(T(x.n ? String(x.n) : "", { bold: true, color: x.n ? ELN[x.k] : C.muted }), { spacing: { after: 0 } }), ew[0], { shading: shade(x.n ? EL[x.k] : "ECECF2") }),
           cell(P(T(x.el.element_text, { bold: true }), { spacing: { after: 0 } }), ew[1]),
           cell(P(T(x.el.maps_to || "", { size: 18 }), { spacing: { after: 0 } }), ew[2]),
-          cell(P([...badge({ "Not found": "Not disclosed", Framing: "Claim wording" }[x.el.status] || x.el.status, { Explicit: "green", Implicit: "green", Equivalent: "amber", "Not found": "red" }[x.el.status] || "grey"), ...(x.el.verify ? badge("Verify", "amber") : [])], { spacing: { after: 0 } }), ew[3]),
+          cell(P([...badge({ "Not found": "Not disclosed", Framing: "Claim wording", Context: "Outside the standard" }[x.el.status] || x.el.status, { Explicit: "green", Implicit: "green", Equivalent: "amber", "Not found": "red" }[x.el.status] || "grey"), ...(x.el.verify ? badge("Verify", "amber") : [])], { spacing: { after: 0 } }), ew[3]),
           cell(P(T([...new Set(arr(x.el.evidence).map(v => "Excerpt " + v.excerpt_number))].join(", ") || "—", { size: 17 }), { spacing: { after: 0 } }), ew[4]) ] }))]));
       }
       // caveats
-      const verify = arr(dec.Verify), nf = colored.filter(x => x.el.status === "Not found");
+      const verify = arr(dec.Verify), nf = colored.filter(x => x.el.status === "Not found"), ctx = colored.filter(x => x.el.status === "Context");
       const cp = (dec.Construction && dec.Construction.claim_words && decisive.has(i)) ? dec.Construction : null;
-      if (verify.length || nf.length || cp) s2.push(table(PGL.W, [PGL.W], [new TableRow({ children: [cell([
+      if (verify.length || nf.length || ctx.length || cp) s2.push(table(PGL.W, [PGL.W], [new TableRow({ children: [cell([
         ...(cp ? [P(T(`Decisive question · “${cp.claim_words}”`, { bold: true, color: "8A5A00" })),
                   ...(cp.question ? [P(T(cp.question, { bold: true, size: 18 }))] : []),
                   (() => { const half = Math.floor((PGL.W - 480) / 2);
@@ -226,7 +226,8 @@ module.exports = function makeBuildDocumentV2(h) {
                   ...(cp.reason ? [P(T(cp.reason + (cp.close_call === true ? " A close call." : ""), { size: 17, color: C.mid }), { spacing: { before: 80 } })] : []),
                   P(T("Claims are read without the patent's description, which may settle the point.", { size: 17, color: C.mid }), { spacing: { before: 40 } })] : []),
         ...(verify.length ? [P(T("To verify", { bold: true, color: "8A5A00" })), ...verify.map(v => P(T(v, { size: 18 })))] : []),
-        ...(nf.length ? [P(T("Not found in the standard", { bold: true, color: "8A0000" })), ...nf.map(x => P(T(x.el.element_text, { size: 18 })))] : []) ], PGL.W,
+        ...(nf.length ? [P(T("Not found in the standard", { bold: true, color: "8A0000" })), ...nf.map(x => P(T(x.el.element_text, { size: 18 })))] : []),
+        ...(ctx.length ? [P(T("Outside the standard (application or product setting; not required by the standard)", { bold: true, color: C.mid })), ...ctx.map(x => P(T(x.el.element_text, { size: 18 })))] : []) ], PGL.W,
         { shading: shade("FDF5E0"), borders: { top: noBorder, bottom: noBorder, right: noBorder, left: solidBorder("E8C96A", 12) } })] })]));
       // reasoning
       const pb = dec.Practised_By || null;

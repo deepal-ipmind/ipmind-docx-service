@@ -118,7 +118,7 @@ function featList(xs) {
 const cap = (s) => s ? s[0].toUpperCase() + s.slice(1) : s;
 const flink = (n) => `<a class="chip" href="#f${esc(n)}">Feature ${esc(n)}</a>`;
 const STATUS_BADGE = { 'Explicit': 'b-green', 'Implicit': 'b-green', 'Equivalent': 'b-amber', 'Not found': 'b-red', 'Inherent': 'b-grey', 'Framing': 'b-grey' };
-const STATUS_LABEL = { 'Not found': 'Not disclosed', 'Framing': 'Claim wording' };
+const STATUS_LABEL = { 'Not found': 'Not disclosed', 'Framing': 'Claim wording', 'Context': 'Outside the standard' };
 // Summary-table caveat: the feature's gap, or its disclosure when that is itself the caveat
 function caveatOf(gap, disclosure) {
   if (gap && gap !== 'None') return gap;
@@ -207,7 +207,7 @@ function buildHtmlV2(data, meta, restricted) {
     let txt = esc(g.text);
     if (g.type === 'Condition' && arr(g.flags).length) txt = (arr(g.tools).length ? esc(g.text) + ' ' : 'Only when this enabling flag is set: ') + '(' + arr(g.flags).map(f => `<code>${esc(f)}</code>`).join(' / ') + ')';
     if (g.type === 'Construction' && g.claim_words) txt = `${esc(g.question || ('How should “' + g.claim_words + '” be read?'))}<span class="cp-res">Decisive: on the alternative reading the claim would be ${esc(decisive.get(String(g.feature)) || '')}</span>`;
-    gapRows.push(`<li><span class="tag ${tagCls[g.type] || 'ver'}">${esc(g.type)}</span>${txt}${g.feature ? ' ' + flink(g.feature) : ''}</li>`);
+    gapRows.push(`<li><span class="tag ${tagCls[g.type] || 'ver'}">${esc(g.type === 'Context' ? 'Outside the standard' : g.type)}</span>${txt}${g.feature ? ' ' + flink(g.feature) : ''}</li>`);
   }
   if (minorCount) gapRows.push(`<li class="minor"><span class="tag cond">Readings</span>${minorCount} other reading${minorCount > 1 ? 's' : ''} considered; none changes the verdict (noted on the features)</li>`);
 
@@ -268,6 +268,7 @@ function buildHtmlV2(data, meta, restricted) {
     }).join('');
     const verify = arr(dec.Verify);
     const notFound = colored.filter(x => x.el.status === 'Not found');
+    const outside = colored.filter(x => x.el.status === 'Context');
     const cp = (dec.Construction && dec.Construction.claim_words) ? dec.Construction : null;
     const essK = (r) => /^\s*(essential\s*\(\s*)?core/i.test(String(r)) ? 'ess-core' : /^\s*(essential\s*\(\s*)?optional/i.test(String(r)) ? 'ess-opt' : 'ess-impl';
     const resParts = (r) => { const m = String(r || '').match(/^([^:]+):\s*(.+)$/); return m ? [m[1].trim(), m[2].trim()] : [String(r || ''), '']; };
@@ -275,7 +276,7 @@ function buildHtmlV2(data, meta, restricted) {
     const isDec = cp && decisive.has(String(c?.Claim_Feature?.Index ?? ''));
     const cpHtml = cp && !isDec ? `<p class="cp-mini"><b>Reading note</b> · “${esc(cp.claim_words)}”: ${esc(cp.adopted_reading || '')} The alternative reading (${esc(cp.narrower_result || '')}) does not change the claim's verdict.</p>` : cp ? `<div class="cav-h">Decisive question · “${esc(cp.claim_words)}”</div>${cp.question ? `<p class="cp-q">${esc(cp.question)}</p>` : ''}<div class="cp-grid">${opt("This chart's reading", cp.adopted_reading, cp.adopted_result, true)}${opt('Arguable route', cp.narrower_reading, cp.narrower_result, false)}</div>${cp.reason ? `<p class="cav-note">${esc(cp.reason)}${cp.close_call === true ? ' A close call.' : ''}</p>` : ''}<p class="cav-note">Claims are read without the patent's description, which may settle the point.</p>` : '';
     const miniNote = '';
-    const caveat = (verify.length || notFound.length || isDec) ? `<div class="caveat">${isDec ? cpHtml : ''}${verify.length ? `<div class="cav-h">To verify</div>${verify.map(v => `<p>${esc(v)}</p>`).join('')}` : ''}${notFound.length ? `<div class="cav-h red">Not found in the standard</div>${notFound.map(x => `<p>${esc(x.el.element_text)}</p>`).join('')}` : ''}</div>` : '';
+    const caveat = (verify.length || notFound.length || outside.length || isDec) ? `<div class="caveat">${isDec ? cpHtml : ''}${verify.length ? `<div class="cav-h">To verify</div>${verify.map(v => `<p>${esc(v)}</p>`).join('')}` : ''}${notFound.length ? `<div class="cav-h red">Not found in the standard</div>${notFound.map(x => `<p>${esc(x.el.element_text)}</p>`).join('')}` : ''}${outside.length ? `<div class="cav-h">Outside the standard (application or product setting; not required by the standard)</div>${outside.map(x => `<p>${esc(x.el.element_text)}</p>`).join('')}` : ''}</div>` : '';
     const essLine = s.essentiality_line || '';
     const excerptHtml = (x) => {
       const im = String(x.text).match(/^Image:\s*(https?:\/\/\S+)\s*$/m);
