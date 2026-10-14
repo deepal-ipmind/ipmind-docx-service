@@ -86,9 +86,11 @@ function markRanges(text, ranges, withSup) {
 // per part ([E.3.1#se:aspect_ratio_idc]), "[… n parts omitted …]" markers and an index of the parts left out, so the
 // model knows what it has and can ask for a missing part. The chart shows the reader's form: one line on what the
 // extract holds, "[…]" where text is left out, no labels, no index; line breaks the PDF put inside a sentence are
-// joined. The standard's words are unchanged.
+// joined. Bold or italic markup kept in the stored text (<b>cbf_cb</b>) and "## " sub-heading markers inside
+// search passages are dropped. The standard's words are unchanged.
 function readerText(t) {
   let s = String(t ?? '');
+  s = s.replace(/<\/?(?:b|i|strong|em)>/gi, '').replace(/^##\s+/gm, '');
   s = s.replace(/^Parts sent: (\d+) of (\d+) \([^)]*\)\. The omitted parts are listed at the end of this excerpt;[^\n]*$/m,
     (m, a, b) => `Extract: ${a} of the clause's ${b} parts, selected for this claim. […] marks text left out.`);
   s = s.replace(/\n*Omitted parts of [^\n]* \(request by id\):\n[\s\S]*$/, '');
@@ -116,7 +118,7 @@ function parseExcerptV2(str) {
   const kept = [];
   for (const l of lines) {
     if (/^#\s/.test(l.trim())) continue;                                   // running-header artefact
-    if (!heading && /^##\s+/.test(l.trim())) { heading = l.trim().replace(/^##\s+/, ''); continue; }
+    if (!heading && /^##\s+/.test(l.trim())) { heading = l.trim().replace(/^##\s+/, '').replace(/<\/?(?:b|i|strong|em)>/gi, ''); continue; }
     kept.push(l);
   }
   return { num, ref, heading, text: readerText(kept.join('\n')).replace(/\n{3,}/g, '\n\n').trim() };
