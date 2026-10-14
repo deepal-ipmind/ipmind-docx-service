@@ -10,7 +10,7 @@
 // Helpers (header, footer, disclaimer, notice, palette) are injected from
 // server.js so both layouts share them.
 // ─────────────────────────────────────────────────────────────────────────────
-const { locate, parseExcerptV2 } = require("./layout-v2");
+const { locate, parseExcerptV2, excerptBlocks, latexLine } = require("./layout-v2");
 
 module.exports = function makeBuildDocumentV2(h) {
   const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType,
@@ -56,7 +56,35 @@ module.exports = function makeBuildDocumentV2(h) {
 
   // Turns text + ranges into paragraphs of runs; highlighted runs are shaded
   // in the element colour and followed by a superscript element number.
-  function highlightedParas(text, ranges, base, paraOpts = {}) {
+  // Excerpt body (14 Oct 2026): text blocks as paragraphs with equations as readable text, tables as Word tables.
+  // An evidence highlight that falls in a table shades the cells it covers.
+  function excerptParas(text, ranges, base) {
+    const rs = arr(ranges).filter(Boolean), out = [];
+    for (const b of excerptBlocks(text)) {
+      if (b.type === "text") {
+        if (!b.text.trim()) continue;
+        const sh = rs.filter(r => r.s < b.e && b.s < r.e).map(r => ({ ...r, s: Math.max(r.s, b.s) - b.s, e: Math.min(r.e, b.e) - b.s }));
+        out.push(...highlightedParas(b.text, sh, base, {}, true));
+        continue;
+      }
+      const ncol = Math.max(1, ...b.rows.map(r => r.length));
+      const W = PGL.W - 400, w = Math.floor(W / ncol), seen = new Set();
+      const line = solidBorder(C.rule, 4);
+      out.push(new Table({ width: { size: W, type: WidthType.DXA }, columnWidths: Array(ncol).fill(w),
+        rows: b.rows.map((r, ri) => new TableRow({ children: r.concat(Array(ncol - r.length).fill({ text: "", spans: [] })).map(c => {
+          const hit = rs.find(x => c.spans.some(([s, e]) => s < x.e && x.s < e));
+          const runs = [T(latexLine(c.text), { size: 15, bold: ri === 0, ...(hit ? { shading: { type: ShadingType.CLEAR, fill: EL[hit.k], color: "auto" } } : {}) })];
+          if (hit && !seen.has(hit)) { runs.push(T(String(hit.n), { size: 15, superScript: true, bold: true, color: ELN[hit.k] })); seen.add(hit); }
+          return new TableCell({ width: { size: w, type: WidthType.DXA }, margins: { top: 40, bottom: 40, left: 80, right: 80 },
+            borders: { top: line, bottom: line, left: line, right: line }, ...(ri === 0 ? { shading: shade(C.surfaceAlt) } : {}),
+            children: [new Paragraph({ children: runs, spacing: { after: 0 } })] });
+        }) })) }));
+      out.push(new Paragraph({ children: [], spacing: { after: 60 } }));
+    }
+    return out;
+  }
+
+  function highlightedParas(text, ranges, base, paraOpts = {}, math = false) {
     const t = String(text ?? "");
     const rs = ranges.filter(Boolean).sort((a, b) => a.s - b.s);
     const segs = []; let pos = 0;
@@ -68,7 +96,7 @@ module.exports = function makeBuildDocumentV2(h) {
       const lines = sg.t.split("\n");
       lines.forEach((ln, li) => {
         if (li > 0) flush();
-        if (ln) runs.push(T(ln, sg.k === undefined ? base : { ...base, shading: { type: ShadingType.CLEAR, fill: EL[sg.k], color: "auto" } }));
+        if (ln) runs.push(T(math ? latexLine(ln) : ln, sg.k === undefined ? base : { ...base, shading: { type: ShadingType.CLEAR, fill: EL[sg.k], color: "auto" } }));
       });
       if (sg.k !== undefined) runs.push(T(String(sg.n), { ...base, superScript: true, bold: true, color: ELN[sg.k] }));
     }
@@ -241,7 +269,7 @@ module.exports = function makeBuildDocumentV2(h) {
       for (const x of cx) s2.push(table(PGL.W, [PGL.W], [
         new TableRow({ children: [cell(P([T("Excerpt " + x.num + "   ", { bold: true, size: 17 }), T(x.ref, { size: 16, font: "Courier New", color: C.muted })], { spacing: { after: 0 } }), PGL.W, { shading: shade(C.surfaceAlt) })] }),
         new TableRow({ children: [cell([...(x.heading ? [P(T(x.heading, { bold: true, size: 18, color: C.navy }))] : []),
-          ...highlightedParas(x.text, exR[x.num] || [], { font: "Courier New", size: 16 })], PGL.W)] }) ]));
+          ...excerptParas(x.text, exR[x.num] || [], { font: "Courier New", size: 16 })], PGL.W)] }) ]));
       if (ox.length) s2.push(P(T("Other retrieved excerpts, not relied on: " + ox.map(x => `Excerpt ${x.num} (${x.ref})`).join("; ") + ". Full text in the HTML report.", { size: 16, color: C.muted }), { spacing: { before: 120, after: 80 } }));
     });
 
