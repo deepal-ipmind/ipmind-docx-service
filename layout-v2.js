@@ -82,6 +82,28 @@ function markRanges(text, ranges, withSup) {
   return out + esc(t.slice(pos));
 }
 
+// Excerpts are stored in the form the analysis reads. A long clause sent in parts carries a "Parts sent" line, a label
+// per part ([E.3.1#se:aspect_ratio_idc]), "[… n parts omitted …]" markers and an index of the parts left out, so the
+// model knows what it has and can ask for a missing part. The chart shows the reader's form: one line on what the
+// extract holds, "[…]" where text is left out, no labels, no index; line breaks the PDF put inside a sentence are
+// joined. The standard's words are unchanged.
+function readerText(t) {
+  let s = String(t ?? '');
+  s = s.replace(/^Parts sent: (\d+) of (\d+) \([^)]*\)\. The omitted parts are listed at the end of this excerpt;[^\n]*$/m,
+    (m, a, b) => `Extract: ${a} of the clause's ${b} parts, selected for this claim. […] marks text left out.`);
+  s = s.replace(/\n*Omitted parts of [^\n]* \(request by id\):\n[\s\S]*$/, '');
+  s = s.replace(/^\[[^\s\]]+#[^\s\]]+\]\n/gm, '');
+  s = s.replace(/^\[… \d+ parts? omitted …\]$/gm, '[…]');
+  const table = (l) => /^\s*\|/.test(l), eq = (l) => /\s=\s/.test(l);
+  const out = [];
+  for (const l of s.split('\n')) {
+    const prev = out.length ? out[out.length - 1] : null;
+    if (prev !== null && /[a-z,]$/.test(prev) && /^[a-z0-9(]/.test(l) && !table(l) && !table(prev) && !eq(l) && !eq(prev)) out[out.length - 1] = prev + ' ' + l;
+    else out.push(l);
+  }
+  return out.join('\n');
+}
+
 function parseExcerptV2(str) {
   const s = String(str ?? '');
   const num = ((s.match(/\*\*Excerpt_Number:\*\*\s*([^\s]+)/) || [])[1] || '?').replace(/\.$/, '');
@@ -97,7 +119,7 @@ function parseExcerptV2(str) {
     if (!heading && /^##\s+/.test(l.trim())) { heading = l.trim().replace(/^##\s+/, ''); continue; }
     kept.push(l);
   }
-  return { num, ref, heading, text: kept.join('\n').replace(/\n{3,}/g, '\n\n').trim() };
+  return { num, ref, heading, text: readerText(kept.join('\n')).replace(/\n{3,}/g, '\n\n').trim() };
 }
 
 const shortDisclosure = (d) => ({ 'Explicitly Disclosed': 'Explicit', 'Implicitly Disclosed': 'Implicit', 'Functionally Equivalent': 'Equivalent', 'Not Disclosed': 'Not disclosed' }[d] || d || '');
