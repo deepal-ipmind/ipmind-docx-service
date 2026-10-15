@@ -10,7 +10,7 @@
 // Helpers (header, footer, disclaimer, notice, palette) are injected from
 // server.js so both layouts share them.
 // ─────────────────────────────────────────────────────────────────────────────
-const { locate, parseExcerptV2, excerptBlocks, latexLine } = require("./layout-v2");
+const { locate, parseExcerptV2, excerptBlocks, latexLine, glanceV3, KEY_V3 } = require("./layout-v2");
 
 module.exports = function makeBuildDocumentV2(h) {
   const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType,
@@ -164,37 +164,42 @@ module.exports = function makeBuildDocumentV2(h) {
     const nReaders = (q) => ((q.votes || {}).M || 0) + ((q.votes || {}).N || 0) + ((q.votes || {}).tie || 0);
     const statusWords = (q) => { const v = q.votes || {}, a = Math.max(v.M || 0, v.N || 0), b = Math.min(v.M || 0, v.N || 0);
       if (q.dropped_by_sceptic) return { notation: "a naming difference, not a dispute", case_by_case: "the same result in every case, not a dispute", contradiction: "the other reading contradicts the claim" }[q.dropped_by_sceptic] || "not a genuine dispute";
-      if (q.status === "agreed") return `all ${nReaders(q)} independent readers agree`;
-      if (q.status === "leans") return `${a} of ${nReaders(q)} independent readers`;
-      if (q.status === "split") return `independent readers split ${a} to ${b}${v.tie ? `, ${v.tie} undecided` : ""}`;
-      return "not checked by independent readers"; };
+      if (q.status === "agreed") return "settled";
+      if (q.status === "leans") return "one reading is clearly stronger";
+      if (q.status === "split") return "both readings are reasonable";
+      return "not assessed"; };
     const BUCKET = { required: ["in the standard and required", "green"], optional: ["in the standard, optional for some products", "green"], implementation: ["in the standard, an implementation choice", "amber"],
       not_in_standard: ["not found in the standard", "red"], outside: ["outside the standard", "grey"], framing: ["framing (e.g. processor, memory)", "grey"] };
     const IN_STD_KIND = { "Stated": "green", "Follows necessarily": "green", "Equivalent": "amber", "Not found": "red", "Outside the standard": "grey", "Framing": "grey" };
     const lowerFirst = (s) => String(s || "").replace(/^Essential · /, "essential · ").replace(/^Not essential/, "not essential").replace(/^Implementation matter/, "implementation matter");
     const panel = oc ? (() => {
-      const ml = oc.most_likely, headAlts = arr(oc.alternatives).filter(a => a.strength === "Arguable");
-      const label = oc.toss_up && headAlts.length ? `${ml.side_label}, or ${lowerFirst(headAlts[0].side_label)}` : ml.side_label;
-      const eq = snap.evidence_quality || {};
-      const evWord = eq.complete ? "complete" : eq.verify_points ? `${eq.verify_points} to verify` : "partial";
-      const col = oc.toss_up ? "8A5A00" : /^Not essential/.test(ml.side_label) ? "8A0000" : /^Implementation/.test(ml.side_label) ? "8A5A00" : "1A6B4A";
-      const qOf = (qid) => q3.find(q => q.qid === qid) || {};
-      const out = [P(T(label, { font: "Georgia", size: 30, bold: true, color: col }), { spacing: { after: 40 } }),
-        P(T(`Most likely outcome  ·  Confidence: ${ml.band}  ·  Evidence: ${evWord}`, { size: 17, bold: true, color: C.mid }), { spacing: { after: 100 } }),
+      // At a glance (D, 15 Oct): the same text as the HTML layout, from glanceV3
+      const g = glanceV3(data);
+      const col = g.toss_up ? "8A5A00" : /^Not essential/.test(g.label) ? "8A0000" : /^Implementation/.test(g.label) ? "8A5A00" : "1A6B4A";
+      const row = (k, words, t, feature, kcol) => P([T(k.toUpperCase() + "  ", { bold: true, size: 15, color: kcol || "1A6B4A" }),
+        ...(words ? [T(`“${words}”: `, { size: 18, bold: true })] : []), T(t, { size: 18 }), ...(feature ? [T(`  (feature ${feature})`, { size: 16, color: C.mid })] : [])], { spacing: { after: 40 } });
+      const out = [P(T(g.label, { font: "Georgia", size: 30, bold: true, color: col }), { spacing: { after: 40 } }),
+        P([T("Most likely outcome  ·  Confidence: ", { size: 17, bold: true, color: C.mid }), T(` ${g.band} `, { size: 17, bold: true, color: "FFFFFF", shading: { type: "clear", color: "auto", fill: g.band === "High" ? "1A6B4A" : g.band === "Moderate" ? "2E7D5B" : "8A5A00" } })], { spacing: { after: 100 } }),
+        ...g.arguable.map(a => P([T("ARGUABLE OUTCOME  ", { bold: true, size: 15, color: C.mid }), T(a, { font: "Georgia", size: 24, bold: true, color: "8A5A00" })], { spacing: { after: 80 } })),
         ...(plainSummary ? [P(T(plainSummary, { size: 21 }), { spacing: { after: 80 } })] : [])];
-      for (const c of arr(ml.conditions)) out.push(P([T("TURNS ON  ", { bold: true, size: 15, color: "1A6B4A" }), T(`“${c.claim_words}” read as: ${c.reading} `, { size: 18 }), T(`(${statusWords(qOf(c.qid))})`, { size: 16, color: C.mid })], { spacing: { after: 40 } }));
-      for (const a of headAlts) out.push(P([T(`${oc.toss_up ? "OR" : "ALTERNATIVE"}  `, { bold: true, size: 15, color: "8A5A00" }), T(`${a.side_label} · ${a.strength.toLowerCase()}: if “${a.condition.claim_words}” means: ${a.condition.reading}`, { size: 18 })], { spacing: { after: 40 } }));
-      out.push(P([T(`Why ${ml.band.toLowerCase()}: `, { bold: true, size: 17 }), T(ml.why_band || "", { size: 17, color: C.mid })], { spacing: { before: 60, after: 40 } }));
-      const b = snap.breakdown;
-      if (b) out.push(P([T(`${b.total} claim feature${b.total === 1 ? "" : "s"}: `, { bold: true, size: 17 }), T(Object.keys(BUCKET).filter(k => b[k]).map(k => `${b[k]} ${BUCKET[k][0]}`).join(" · "), { size: 17, color: C.mid })], { spacing: { after: 60 } }));
-      for (const q of q3.filter(q => !q.decides)) out.push(P([T("READING SETTLED  ", { bold: true, size: 14, color: C.muted }), T(`“${q.claim_words}”: ${q.leading === "M" ? q.reading_M : q.reading_N} (${statusWords(q)})`, { size: 16, color: C.mid })], { spacing: { after: 20 } }));
+      const gh = (t) => P(T(t.toUpperCase(), { bold: true, size: 14, color: C.mid }), { spacing: { before: 100, after: 30 } });
+      if (g.who.length) { out.push(gh("Who practises the claim")); for (const x of g.who) out.push(row(x.k, "", x.t)); }
+      out.push(gh("What could change the result"));
+      if (g.change.length) for (const x of g.change) out.push(row(x.k, x.words, x.t, x.feature, "8A5A00"));
+      else out.push(P(T(g.nothing, { size: 18 }), { spacing: { after: 40 } }));
+      if (g.notRequired.length) { out.push(gh("Not required by the standard")); for (const x of g.notRequired) out.push(row(`Feature ${x.feature}`, "", x.t, "", "8A5A00")); }
+      if (gapsPlain.length) {
+        out.push(P(T(`What is missing (${gapsPlain.length})`, { bold: true, size: 19, color: "8A0000" }), { spacing: { before: 80, after: 40 } }));
+        for (const gp of gapsPlain) out.push(P([T(`Feature ${gp.feature}  `, { bold: true, size: 18 }), T(gp.text, { size: 18 })], { spacing: { after: 40 } }));
+      }
+      if (g.points.length) { out.push(gh("Construction points settled")); for (const x of g.points) out.push(P([T(`“${x.words}”: `, { bold: true, size: 16 }), T(x.t, { size: 16, color: C.mid })], { spacing: { after: 20 } })); }
       return out;
     })() : [
       P([T(vLabel, { font: "Georgia", size: 30, bold: true, color: vText }), T(`     ${verdict.features_aligned ?? "—"}/${verdict.features_technical ?? "—"} features aligned  ·  Evidence strength: ${band}`, { size: 17, color: C.mid })], { spacing: { after: 100 } }),
       ...(plainSummary ? [P(T(plainSummary, { size: 21 }), { spacing: { after: 80 } })] : []),
       ...(evidenceLine ? [P(T(evidenceLine, { size: 17, color: C.mid }), { spacing: { after: 80 } })] : []),
     ];
-    if (gapsPlain.length) {
+    if (gapsPlain.length && !oc) {
       panel.push(P(T(`What is missing (${gapsPlain.length})`, { bold: true, size: 19, color: "8A0000" }), { spacing: { before: 80, after: 40 } }));
       for (const g of gapsPlain) panel.push(P([T(`Feature ${g.feature}  `, { bold: true, size: 18 }), T(g.text, { size: 18 })], { spacing: { after: 40 } }));
     }
@@ -231,9 +236,8 @@ module.exports = function makeBuildDocumentV2(h) {
           cell([P(badge(a.for_products || "", (BUCKET[s.bucket] || ["", "grey"])[1]), { spacing: { after: 0 } })], sw3[4]),
           cell([...(cav || (!qs.length && !flags.length) ? [P(T(cav || "None", { size: 17, color: cav ? "8A5A00" : C.muted }), { spacing: { after: 0 } })] : []),
                 ...(flags.length ? [P([...badge("Encoder switch", "green"), T(" (" + flags.join(" / ") + ")", { size: 14, font: "Courier New", color: C.mid })], { spacing: { after: 0 } })] : []),
-                ...qs.map(q => P([...badge(q.decides ? "Decides" : "Reading", "amber"), T(` “${q.claim_words}”: ${statusWords(q)}`, { size: 16 })], { spacing: { after: 0 } }))], sw3[5]) ] });
+                ...qs.map(q => P([...badge(q.decides ? "Decisive point" : "Construction point", "amber"), T(` “${q.claim_words}”: ${statusWords(q)}`, { size: 16 })], { spacing: { after: 0 } }))], sw3[5]) ] });
       })]));
-      s1.push(P(T("In the standard? whether the standard states the feature, it follows necessarily, or it is not found. For products: which products must practise it. A decoder must decode every bitstream of its profile, so a tool an encoder can switch off is still core for decoders.", { size: 16, color: C.mid }), { spacing: { before: 80 } }));
     } else
     s1.push(table(PG.W, sw, [headRow(["#", "Claim feature", "Maps to", "Essentiality", "Gap or caveat"], sw), ...charts.map(c => {
       const i = String(c?.Claim_Feature?.Index ?? ""), s = sumByIdx[i] || {}, dec = c.Decision || {}, e = essParts(dec.Essentiality_Classification);
@@ -296,7 +300,7 @@ module.exports = function makeBuildDocumentV2(h) {
         const q = q3.find(x => x.qid === r.qid) || r;
         const used = r.reading_used || q.leading, other = used === "M" ? "N" : "M";
         const alt = arr((c.Routes || {}).alternatives).find(x => x.qid === r.qid);
-        const altRes = alt && alt.analysis ? (alt.analysis.Disclosure_Decision === "Not Disclosed" ? "Not disclosed" : `${alt.analysis.Disclosure_Decision || ""}${alt.classification ? " · " + alt.classification.classification : ""}`) : "Not re-analysed (the readers agreed)";
+        const altRes = alt && alt.analysis ? (alt.analysis.Disclosure_Decision === "Not Disclosed" ? "Not disclosed" : `${alt.analysis.Disclosure_Decision || ""}${alt.classification ? " · " + alt.classification.classification : ""}`) : "Not analysed: the point is settled";
         const half = Math.floor((PGL.W - 480) / 2);
         const col = (label, reading, result, adopted) => cell([
           P([T(label.toUpperCase(), { bold: true, size: 15, color: C.mid }), ...(adopted ? [T("   used throughout", { bold: true, size: 15, color: "1A6B4A" })] : [])], { spacing: { after: 60 } }),
@@ -304,9 +308,9 @@ module.exports = function makeBuildDocumentV2(h) {
           P([T("→ ", { size: 18, color: C.mid }), T(result, { bold: true, size: 18, color: adopted ? "1A6B4A" : "8A5A00" })], { spacing: { after: 0 } })],
           half, { shading: shade("FFFFFF"), borders: { top: solidBorder(adopted ? "9FD1B6" : "E8C96A", 6), bottom: solidBorder(adopted ? "9FD1B6" : "E8C96A", 6), left: solidBorder(adopted ? "1A6B4A" : "E8C96A", adopted ? 18 : 6), right: solidBorder(adopted ? "9FD1B6" : "E8C96A", 6) } });
         s2.push(table(PGL.W, [PGL.W], [new TableRow({ children: [cell([
-          P(T(`Reading question · “${q.claim_words}”`, { bold: true, color: "8A5A00" })),
+          P(T(`Construction point · “${q.claim_words}”`, { bold: true, color: "8A5A00" })),
           table(half * 2, [half, half], [new TableRow({ children: [col("This chart's reading", used === "M" ? q.reading_M : q.reading_N, dec.Disclosure || "", true), col("Other reading", other === "M" ? q.reading_M : q.reading_N, altRes, false)] })]),
-          P(T(`${cap(statusWords(q))}. Readers saw only the claim, not the standard or the result. Claims are read without the patent's description, which may settle the point.`, { size: 17, color: C.mid }), { spacing: { before: 80 } })],
+          P(T(`${cap(statusWords(q))}. Claims are read without the patent's description, which may settle the point.`, { size: 17, color: C.mid }), { spacing: { before: 80 } })],
           PGL.W, { shading: shade("FDF5E0") })] })]));
       }
       // caveats
@@ -351,11 +355,7 @@ module.exports = function makeBuildDocumentV2(h) {
     if (lim) { const ll = lim.split("\n")[0].trim(), lb = lim.split("\n").slice(1).join("\n").trim();
       s3.push(sub("Limitations" + (ll ? ": " + ll : ""))); if (lb) s3.push(P(T(lb, { color: C.mid }))); }
     const M = data.Methodology || {};
-    const terms3 = [
-      { label: "Most likely outcome and confidence", definition: "The headline is the outcome on the readings and evidence most likely to hold. Its confidence is set by fixed rules, not by the analyst's own view. High: no reading question the outcome turns on is in doubt, and the evidence is complete. Moderate: one deciding reading leans one way, or there are minor gaps in the evidence (points to verify). Toss-up: a deciding reading is genuinely split; both outcomes are shown, the one under which the claim maps first." },
-      { label: "Alternative outcomes", definition: "An outcome that holds if a reading question goes the other way. Arguable where the other reading has real support; weak alternatives are not shown in the headline." },
-      { label: "Reading questions", definition: "Claims are read on their own wording, without the patent's description. Where the outcome turns on how claim words are read, the question is first checked for being a genuine dispute (not a naming difference, and not a rule that gives the same result in every case). Each remaining question is then read five times by independent readers who see only the claim, not the standard or the result. The chart uses the leading reading throughout; the other reading is analysed as a separate, complete route." },
-      { label: "For products", definition: "Which products must practise the feature. A decoder must decode every bitstream of its profile, so a tool an encoder can switch off with an enabling flag is still core for decoders, while encoders use it only if they switch it on. Features that depend on an SEI message are optional for every product: only products that implement that message practise them." }];
+    const terms3 = KEY_V3;
     // v3: the methodology's essentiality tiers describe the enabling-flag test, which D19 replaced
     const terms = oc ? [...terms3, ...arr(M.disclosure_categories)] : [{ label: "Evidence strength", definition: "High where most features are stated directly in the standard; Moderate where several rest on necessary implication, a point to verify, or equivalence; Low where the mapping depends substantially on these or features are not disclosed. (Weighted mapping of at least 85%, 70–84%, below 70%.)" }, { label: "Reading of the claims", definition: "Claims are read on their own wording, without the patent's description. Where claim words can reasonably be read more than one way, the chart adopts the reading a skilled reader would find more natural, as a judge would, and shows the other as an arguable route with its result. Where the two are genuinely balanced, the chart adopts the reading under which the claim maps and marks a close call." }, ...arr(M.disclosure_categories), ...arr(M.essentiality_tiers)];
     const ckey = (id) => String(id).split(".").map(p => /^\d+$/.test(p) ? p.padStart(4, "0") : p).join(".");
