@@ -164,10 +164,10 @@ module.exports = function makeBuildDocumentV2(h) {
     const nReaders = (q) => ((q.votes || {}).M || 0) + ((q.votes || {}).N || 0) + ((q.votes || {}).tie || 0);
     const statusWords = (q) => { const v = q.votes || {}, a = Math.max(v.M || 0, v.N || 0), b = Math.min(v.M || 0, v.N || 0);
       if (q.dropped_by_sceptic) return { notation: "a naming difference, not a dispute", case_by_case: "the same result in every case, not a dispute", contradiction: "the other reading contradicts the claim" }[q.dropped_by_sceptic] || "not a genuine dispute";
-      if (q.status === "agreed") return `all ${nReaders(q)} independent assessments agree`;
-      if (q.status === "leans") return `${a} of ${nReaders(q)} independent assessments`;
-      if (q.status === "split") return `independent assessments split ${a} to ${b}${v.tie ? `, ${v.tie} undecided` : ""}`;
-      return "not independently assessed"; };
+      if (q.status === "agreed") return "settled";
+      if (q.status === "leans") return "one reading is clearly stronger";
+      if (q.status === "split") return "both readings are reasonable";
+      return "not assessed"; };
     const BUCKET = { required: ["in the standard and required", "green"], optional: ["in the standard, optional for some products", "green"], implementation: ["in the standard, an implementation choice", "amber"],
       not_in_standard: ["not found in the standard", "red"], outside: ["outside the standard", "grey"], framing: ["framing (e.g. processor, memory)", "grey"] };
     const IN_STD_KIND = { "Stated": "green", "Follows necessarily": "green", "Equivalent": "amber", "Not found": "red", "Outside the standard": "grey", "Framing": "grey" };
@@ -180,6 +180,7 @@ module.exports = function makeBuildDocumentV2(h) {
         ...(words ? [T(`“${words}”: `, { size: 18, bold: true })] : []), T(t, { size: 18 }), ...(feature ? [T(`  (feature ${feature})`, { size: 16, color: C.mid })] : [])], { spacing: { after: 40 } });
       const out = [P(T(g.label, { font: "Georgia", size: 30, bold: true, color: col }), { spacing: { after: 40 } }),
         P([T("Most likely outcome  ·  Confidence: ", { size: 17, bold: true, color: C.mid }), T(` ${g.band} `, { size: 17, bold: true, color: "FFFFFF", shading: { type: "clear", color: "auto", fill: g.band === "High" ? "1A6B4A" : g.band === "Moderate" ? "2E7D5B" : "8A5A00" } })], { spacing: { after: 100 } }),
+        ...g.arguable.map(a => P([T("ARGUABLE OUTCOME  ", { bold: true, size: 15, color: C.mid }), T(a, { font: "Georgia", size: 24, bold: true, color: "8A5A00" })], { spacing: { after: 80 } })),
         ...(plainSummary ? [P(T(plainSummary, { size: 21 }), { spacing: { after: 80 } })] : [])];
       const gh = (t) => P(T(t.toUpperCase(), { bold: true, size: 14, color: C.mid }), { spacing: { before: 100, after: 30 } });
       if (g.who.length) { out.push(gh("Who practises the claim")); for (const x of g.who) out.push(row(x.k, "", x.t)); }
@@ -299,7 +300,7 @@ module.exports = function makeBuildDocumentV2(h) {
         const q = q3.find(x => x.qid === r.qid) || r;
         const used = r.reading_used || q.leading, other = used === "M" ? "N" : "M";
         const alt = arr((c.Routes || {}).alternatives).find(x => x.qid === r.qid);
-        const altRes = alt && alt.analysis ? (alt.analysis.Disclosure_Decision === "Not Disclosed" ? "Not disclosed" : `${alt.analysis.Disclosure_Decision || ""}${alt.classification ? " · " + alt.classification.classification : ""}`) : "Not analysed: every assessment agreed";
+        const altRes = alt && alt.analysis ? (alt.analysis.Disclosure_Decision === "Not Disclosed" ? "Not disclosed" : `${alt.analysis.Disclosure_Decision || ""}${alt.classification ? " · " + alt.classification.classification : ""}`) : "Not analysed: the point is settled";
         const half = Math.floor((PGL.W - 480) / 2);
         const col = (label, reading, result, adopted) => cell([
           P([T(label.toUpperCase(), { bold: true, size: 15, color: C.mid }), ...(adopted ? [T("   used throughout", { bold: true, size: 15, color: "1A6B4A" })] : [])], { spacing: { after: 60 } }),
@@ -309,7 +310,7 @@ module.exports = function makeBuildDocumentV2(h) {
         s2.push(table(PGL.W, [PGL.W], [new TableRow({ children: [cell([
           P(T(`Construction point · “${q.claim_words}”`, { bold: true, color: "8A5A00" })),
           table(half * 2, [half, half], [new TableRow({ children: [col("This chart's reading", used === "M" ? q.reading_M : q.reading_N, dec.Disclosure || "", true), col("Other reading", other === "M" ? q.reading_M : q.reading_N, altRes, false)] })]),
-          P(T(`${cap(statusWords(q))}. Each assessment saw only the claim, not the standard or this chart's result. Claims are read without the patent's description, which may settle the point.`, { size: 17, color: C.mid }), { spacing: { before: 80 } })],
+          P(T(`${cap(statusWords(q))}. Claims are read without the patent's description, which may settle the point.`, { size: 17, color: C.mid }), { spacing: { before: 80 } })],
           PGL.W, { shading: shade("FDF5E0") })] })]));
       }
       // caveats
