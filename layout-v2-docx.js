@@ -11,6 +11,8 @@
 // server.js so both layouts share them.
 // ─────────────────────────────────────────────────────────────────────────────
 const { locate, parseExcerptV2, excerptBlocks, latexLine } = require("./layout-v2");
+// R1: the standard's labels and merged tables come with the chart (Snapshot.labels / .tables); HEVC's by default
+const { labelsFor, mergedTable } = require("./labels-v2");
 
 module.exports = function makeBuildDocumentV2(h) {
   const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType,
@@ -43,14 +45,9 @@ module.exports = function makeBuildDocumentV2(h) {
 
   const shortDisc = (d) => ({ "Explicitly Disclosed": "Explicit", "Implicitly Disclosed": "Implicit", "Functionally Equivalent": "Equivalent", "Not Disclosed": "Not disclosed" }[d] || d || "");
   const discKind  = (d) => d === "Not Disclosed" ? "red" : d === "Functionally Equivalent" ? "amber" : "green";
-  function essParts(cls) {
-    const [scope, side] = String(cls || "").split(" | ");
-    const m = scope.match(/^Essential \((.+)\)$/);
-    const label = m ? m[1].replace(/ in Main Profile$/, "").replace(/^Optional in Profile SEP$/, "Optional (profile SEP)") : scope;
-    const kind = m ? (/^Core/.test(m[1]) ? "core" : "green") : (/inherent|non-technical/i.test(scope) ? "grey" : /implementation/i.test(scope) ? "amber" : "red");
-    return { scope, side: side || "", label, kind };
-  }
-  const sideWords = (s) => ({ "Encoder and Decoder": "Encoder and decoder", "Decoder": "Decoder only", "Encoder": "Encoder only", "Codec System": "Codec system only" }[s] || "");
+  // the chart's labels (labels-v2.js): made per document in buildDocumentV2 and passed on, never shared between builds
+  const DOCX_KIND = { core: "core", opt: "green", inh: "grey", impl: "amber", no: "red" };
+  const essPartsOf = (LB) => (cls) => { const e = LB.essParts(cls); return { ...e, kind: DOCX_KIND[e.kind] || "red" }; };
   const featList = (xs) => { const a = arr(xs).map(String); return !a.length ? "" : a.length === 1 ? `feature ${a[0]}` : `features ${a.slice(0, -1).join(", ")} and ${a[a.length - 1]}`; };
   const cap = (s) => s ? s[0].toUpperCase() + s.slice(1) : s;
 
@@ -58,7 +55,7 @@ module.exports = function makeBuildDocumentV2(h) {
   // in the element colour and followed by a superscript element number.
   // Excerpt body (14 Oct 2026): text blocks as paragraphs with equations as readable text, tables as Word tables.
   // An evidence highlight that falls in a table shades the cells it covers.
-  function excerptParas(text, ranges, base) {
+  function excerptParas(text, ranges, base, tables) {
     const rs = arr(ranges).filter(Boolean), out = [];
     for (const b of excerptBlocks(text)) {
       if (b.type === "text") {
@@ -70,6 +67,21 @@ module.exports = function makeBuildDocumentV2(h) {
       const ncol = Math.max(1, ...b.rows.map(r => r.length));
       const W = PGL.W - 400, w = Math.floor(W / ncol), seen = new Set();
       const line = solidBorder(C.rule, 4);
+      const mt = tables && tables.length ? mergedTable(String(text).slice(b.s, b.e), tables) : null;
+      if (mt && b.rows.every(r => r.length === ncol) && mt.rows.every(cells => cells.every(c => c.cover.every(([r, k]) => b.rows[r] && b.rows[r][k])))) {
+        out.push(new Table({ width: { size: W, type: WidthType.DXA }, columnWidths: Array(ncol).fill(w),
+          rows: mt.rows.map(cells => new TableRow({ children: cells.map(c => {
+            const hit = rs.find(x => c.cover.some(([r, k]) => b.rows[r][k].spans.some(([s, e]) => s < x.e && x.s < e)));
+            const runs = [T(latexLine(c.text), { size: 15, bold: c.th, ...(hit ? { shading: { type: ShadingType.CLEAR, fill: EL[hit.k], color: "auto" } } : {}) })];
+            if (hit && !seen.has(hit)) { runs.push(T(String(hit.n), { size: 15, superScript: true, bold: true, color: ELN[hit.k] })); seen.add(hit); }
+            return new TableCell({ width: { size: w * c.cs, type: WidthType.DXA }, margins: { top: 40, bottom: 40, left: 80, right: 80 },
+              ...(c.rs > 1 ? { rowSpan: c.rs } : {}), ...(c.cs > 1 ? { columnSpan: c.cs } : {}),
+              borders: { top: line, bottom: line, left: line, right: line }, ...(c.th ? { shading: shade(C.surfaceAlt) } : {}),
+              children: [new Paragraph({ children: runs, spacing: { after: 0 } })] });
+          }) })) }));
+        out.push(new Paragraph({ children: [], spacing: { after: 60 } }));
+        continue;
+      }
       out.push(new Table({ width: { size: W, type: WidthType.DXA }, columnWidths: Array(ncol).fill(w),
         rows: b.rows.map((r, ri) => new TableRow({ children: r.concat(Array(ncol - r.length).fill({ text: "", spans: [] })).map(c => {
           const hit = rs.find(x => c.spans.some(([s, e]) => s < x.e && x.s < e));
@@ -106,6 +118,7 @@ module.exports = function makeBuildDocumentV2(h) {
 
   return async function buildDocumentV2(data, meta, restricted) {
     const snap = data.Snapshot || {}, verdict = snap.verdict || {}, align = snap.alignment || {};
+    const LB = labelsFor(snap), essParts = essPartsOf(LB), sideWords = (s) => LB.sides[s] || "";
     const charts = arr(data.Claim_Charts);
     const sumByIdx = {}; for (const f of arr(snap.features)) sumByIdx[String(f.index)] = f;
     const patent = safeStr(data.Patent_Number || meta.Patent_Number || "");
@@ -113,7 +126,7 @@ module.exports = function makeBuildDocumentV2(h) {
     const owner  = safeStr(data.Owner || meta.Owner || "");
     const standard = [data.Standard || meta.Standard || "", data.Standard_Edition || ""].filter(Boolean).join(" · ");
     const claimNo = safeStr(data.Claim_Number || "");
-    const catWords = { Encoder: "Encoder claim", Decoder: "Decoder claim", Encoder_and_Decoder_System: "Encoder and decoder claim", Other: "Other claim type" }[data.Claim_Category] || "";
+    const catWords = LB.categories[data.Claim_Category] || "";
 
     // ── Section 1: identity, at a glance, summary mapping ──
     const s1 = [];
@@ -131,15 +144,12 @@ module.exports = function makeBuildDocumentV2(h) {
     const vText = essential ? "1A6B4A" : ov.kind === "amber" ? "8A5A00" : ov.kind === "grey" ? C.navy : "8A0000";
     const vLabel = essential ? "Essential · " + ov.scope.replace(/^Essential \((.+)\)$/, "$1") : (ov.scope || "—");
     // decisive construction points: from the snapshot (b31+), else computed from the charts
-    const RANK = (t) => { const x = String(t || "").toLowerCase();
-      if (/not disclosed|not essential/.test(x)) return 4; if (/implementation/.test(x)) return 3;
-      if (/profile/.test(x) && !/main profile/.test(x)) return 2; if (/optional/.test(x)) return 1; return 0; };
-    const RLABEL = ["Essential (Core)", "Essential (Optional)", "Essential (Profile SEP)", "Implementation Matter", "Not Essential"];
+    const RANK = LB.rank, RLABEL = LB.rankLabels, WORST = RLABEL.length - 1;
     const fr = charts.map(c => { const d = c.Decision || {}; const inh = /inherent/i.test(String(d.Essentiality_Classification || ""));
-      const own = inh ? 0 : (d.Disclosure === "Not Disclosed" ? 4 : RANK(d.Essentiality_Classification));
+      const own = inh ? 0 : (d.Disclosure === "Not Disclosed" ? WORST : RANK(d.Essentiality_Classification));
       const cp = (d.Construction && d.Construction.claim_words) ? d.Construction : null;
       const altT = cp ? String(cp.narrower_result || "") : "";
-      const alt = cp && !inh ? (/not disclosed/i.test(altT) ? 4 : /disclosed/i.test(altT) ? (own === 4 ? 0 : own) : RANK(altT)) : own;
+      const alt = cp && !inh ? (/not disclosed/i.test(altT) ? WORST : /disclosed/i.test(altT) ? (own === WORST ? 0 : own) : RANK(altT)) : own;
       return { idx: String(c?.Claim_Feature?.Index ?? ""), own, alt, cp }; });
     const baseRank = Math.max(0, ...fr.map(f => f.own));
     const decisive = new Map();
@@ -259,7 +269,7 @@ module.exports = function makeBuildDocumentV2(h) {
         { shading: shade("FDF5E0"), borders: { top: noBorder, bottom: noBorder, right: noBorder, left: solidBorder("E8C96A", 12) } })] })]));
       // reasoning
       const pb = dec.Practised_By || null;
-      const rs = [["Who practises it", pb ? `Decoder: ${pb.decoder || ""} Encoder (${pb.encoder_case || ""}): ${pb.encoder || ""}` : ""], ["Interpretation", an.Interpretation], ["Opinion", an.Overall_Opinion],
+      const rs = [["Who practises it", LB.whoText(pb)], ["Interpretation", an.Interpretation], ["Opinion", an.Overall_Opinion],
         ["Differences", an.Differences && !/^none\.?$/i.test(String(an.Differences).trim()) ? an.Differences : ""], ["Essentiality justification", dec.Justification]].filter(([, v]) => v);
       if (rs.length) { s2.push(new Paragraph({ children: [T("Reasoning", { bold: true, color: C.navy })], spacing: { before: 160, after: 60 } }));
         for (const [hh, v] of rs) s2.push(P([T(hh + ". ", { bold: true, size: 18, color: C.mid }), T(v, { size: 18, color: C.mid })])); }
@@ -269,7 +279,7 @@ module.exports = function makeBuildDocumentV2(h) {
       for (const x of cx) s2.push(table(PGL.W, [PGL.W], [
         new TableRow({ children: [cell(P([T("Excerpt " + x.num + "   ", { bold: true, size: 17 }), T(x.ref, { size: 16, font: "Courier New", color: C.muted })], { spacing: { after: 0 } }), PGL.W, { shading: shade(C.surfaceAlt) })] }),
         new TableRow({ children: [cell([...(x.heading ? [P(T(x.heading, { bold: true, size: 18, color: C.navy }))] : []),
-          ...excerptParas(x.text, exR[x.num] || [], { font: "Courier New", size: 16 })], PGL.W)] }) ]));
+          ...excerptParas(x.text, exR[x.num] || [], { font: "Courier New", size: 16 }, LB.tables)], PGL.W)] }) ]));
       if (ox.length) s2.push(P(T("Other retrieved excerpts, not relied on: " + ox.map(x => `Excerpt ${x.num} (${x.ref})`).join("; ") + ". Full text in the HTML report.", { size: 16, color: C.muted }), { spacing: { before: 120, after: 80 } }));
     });
 

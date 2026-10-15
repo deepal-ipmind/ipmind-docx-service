@@ -44,6 +44,8 @@ const arr = (x) => Array.isArray(x) ? x : (x == null ? [] : [x]);
 // equation fails to render, its source text is shown as before. The standard's words are unchanged.
 let katex = null;
 try { katex = require('katex'); } catch (e) { katex = null; }
+// R1: the standard's labels and merged tables come with the chart (Snapshot.labels / .tables); HEVC's by default
+const { labelsFor, mergedTable } = require('./labels-v2');
 const unesc = (s) => String(s).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
 function renderMath(tex, display) {
   if (!katex) return null;
@@ -127,7 +129,7 @@ function cellsOf(row) {
   return { cells: out, sep: out.length > 0 && out.every(c => /^:?-{2,}:?$/.test(c.text)) };
 }
 const overlaps = (spans, r) => spans.some(([s, e]) => s < r.e && r.s < e);
-function excerptBodyHtml(text, ranges) {
+function excerptBodyHtml(text, ranges, tables) {
   const rs = (ranges || []).filter(Boolean);
   return excerptBlocks(text).map(b => {
     if (b.type === 'text') {
@@ -135,6 +137,19 @@ function excerptBodyHtml(text, ranges) {
       return b.text.trim() ? `<pre>${mathify(markRanges(b.text, sh, true))}</pre>` : '';
     }
     const ncol = Math.max(...b.rows.map(r => r.length), 1), seen = new Set();
+    // a table with merged cells, carried by the chart: drawn with its merges; a highlight found in any grid cell a
+    // merged cell covers marks that cell. If the grid doesn't line up with the table, the grid is drawn as before.
+    const mt = tables && tables.length ? mergedTable(String(text).slice(b.s, b.e), tables) : null;
+    if (mt && b.rows.every(r => r.length === ncol) && mt.rows.every(cells => cells.every(c => c.cover.every(([r, k]) => b.rows[r] && b.rows[r][k])))) {
+      const mrows = mt.rows.map(cells => '<tr>' + cells.map(c => {
+        const tag = c.th ? 'th' : 'td';
+        const hit = rs.find(x => c.cover.some(([r, k]) => overlaps(b.rows[r][k].spans, x)));
+        let inner = mathify(esc(c.text));
+        if (hit) { inner = `<mark class="hl ${hit.cls}">${inner}${seen.has(hit) ? '' : `<sup>${hit.n}</sup>`}</mark>`; seen.add(hit); }
+        return `<${tag}${c.rs > 1 ? ` rowspan="${c.rs}"` : ''}${c.cs > 1 ? ` colspan="${c.cs}"` : ''}>${inner}</${tag}>`;
+      }).join('') + '</tr>').join('');
+      return `<div class="ex-tw"><table class="ex-table">${mrows}</table></div>`;
+    }
     const rowsHtml = b.rows.map((r, ri) => {
       const cells = r.concat(Array(ncol - r.length).fill({ text: '', spans: [] }));
       return '<tr>' + cells.map(c => {
@@ -237,14 +252,7 @@ function parseExcerptV2(str) {
 }
 
 const shortDisclosure = (d) => ({ 'Explicitly Disclosed': 'Explicit', 'Implicitly Disclosed': 'Implicit', 'Functionally Equivalent': 'Equivalent', 'Not Disclosed': 'Not disclosed' }[d] || d || '');
-function essParts(cls) {
-  const [scope, side] = String(cls || '').split(' | ');
-  const m = scope.match(/^Essential \((.+)\)$/);
-  const label = m ? m[1].replace(/ in Main Profile$/, '').replace(/^Optional in Profile SEP$/, 'Optional (profile SEP)') : scope;
-  const kind = m ? (/^Core/.test(m[1]) ? 'core' : 'opt') : (/inherent|non-technical/i.test(scope) ? 'inh' : /implementation/i.test(scope) ? 'impl' : 'no');
-  return { scope, side: side || '', label, kind };
-}
-const sideWords = (side) => ({ 'Encoder and Decoder': 'Encoder and decoder', 'Decoder': 'Decoder only', 'Encoder': 'Encoder only', 'Codec System': 'Codec system only' }[side] || '');
+// essParts and sideWords: from the chart's labels (labels-v2.js), inside buildHtmlV2
 function featList(xs) {
   const a = arr(xs).map(String);
   if (!a.length) return '';
@@ -270,6 +278,8 @@ const BAND_NOTE = 'Evidence strength: High where most features are stated direct
 // ── Builder ────────────────────────────────────────────────────────────────
 function buildHtmlV2(data, meta, restricted) {
   const snap    = data.Snapshot || {};
+  const LB = labelsFor(snap);
+  const essParts = LB.essParts, sideWords = (side) => LB.sides[side] || '';
   const verdict = snap.verdict || {};
   const align   = snap.alignment || {};
   const charts  = arr(data.Claim_Charts);
@@ -281,7 +291,7 @@ function buildHtmlV2(data, meta, restricted) {
   const owner    = data.Owner || meta.Owner || '';
   const standard = [data.Standard || meta.Standard || '', data.Standard_Edition || ''].filter(Boolean).join(' · ');
   const claimNo  = data.Claim_Number || '';
-  const catWords = { Encoder: 'Encoder claim', Decoder: 'Decoder claim', Encoder_and_Decoder_System: 'Encoder and decoder claim', Other: 'Other claim type' }[data.Claim_Category] || '';
+  const catWords = LB.categories[data.Claim_Category] || '';
 
   // verdict
   const ov = essParts((verdict.classification || '') + (verdict.side ? ' | ' + verdict.side : ''));
@@ -293,12 +303,10 @@ function buildHtmlV2(data, meta, restricted) {
   const nFav = Number(verdict.favourable_readings || 0), nLess = Number(verdict.less_natural_count || 0);
   // ── decisive construction points: a point is decisive if switching that one feature to its
   //    alternative result would change the claim's verdict (same aggregation as the verdict)
-  const RANK = (t) => { const x = String(t || '').toLowerCase();
-    if (/not disclosed|not essential/.test(x)) return 4; if (/implementation/.test(x)) return 3;
-    if (/profile/.test(x) && !/main profile/.test(x)) return 2; if (/optional/.test(x)) return 1; return 0; };
-  const RLABEL = ['Essential (Core)', 'Essential (Optional)', 'Essential (Profile SEP)', 'Implementation Matter', 'Not Essential'];
+  const RANK = LB.rank;
+  const RLABEL = LB.rankLabels;
   const fr = charts.map(c => { const d = c.Decision || {}; const inh = /inherent/i.test(String(d.Essentiality_Classification || ''));
-    const own = inh ? 0 : (d.Disclosure === 'Not Disclosed' ? 4 : RANK(d.Essentiality_Classification));
+    const own = inh ? 0 : (d.Disclosure === 'Not Disclosed' ? RLABEL.length - 1 : RANK(d.Essentiality_Classification));
     const cp = (d.Construction && d.Construction.claim_words) ? d.Construction : null;
     return { idx: String(c?.Claim_Feature?.Index ?? ''), own, cp, alt: cp && !inh ? Math.max(own, RANK(cp.narrower_result)) : own }; });
   const baseRank = Math.max(0, ...fr.map(f => f.own));
@@ -341,7 +349,7 @@ function buildHtmlV2(data, meta, restricted) {
   for (const g of G) {
     if (g.type === 'Construction' && !decisive.has(String(g.feature))) continue;
     let txt = esc(g.text);
-    if (g.type === 'Condition' && arr(g.flags).length) txt = (arr(g.tools).length ? esc(g.text) + ' ' : 'Only when this enabling flag is set: ') + '(' + arr(g.flags).map(f => `<code>${esc(f)}</code>`).join(' / ') + ')';
+    if (g.type === 'Condition' && arr(g.flags).length) txt = (arr(g.tools).length ? esc(g.text) + ' ' : esc(LB.conditionPrefix)) + '(' + arr(g.flags).map(f => `<code>${esc(f)}</code>`).join(' / ') + ')';
     if (g.type === 'Construction' && g.claim_words) txt = `${esc(g.question || ('How should “' + g.claim_words + '” be read?'))}<span class="cp-res">Decisive: on the alternative reading the claim would be ${esc(decisive.get(String(g.feature)) || '')}</span>`;
     gapRows.push(`<li><span class="tag ${tagCls[g.type] || 'ver'}">${esc(g.type === 'Context' ? 'Outside the standard' : g.type)}</span>${txt}${g.feature ? ' ' + flink(g.feature) : ''}</li>`);
   }
@@ -406,7 +414,7 @@ function buildHtmlV2(data, meta, restricted) {
     const notFound = colored.filter(x => x.el.status === 'Not found');
     const outside = colored.filter(x => x.el.status === 'Context');
     const cp = (dec.Construction && dec.Construction.claim_words) ? dec.Construction : null;
-    const essK = (r) => /^\s*(essential\s*\(\s*)?core/i.test(String(r)) ? 'ess-core' : /^\s*(essential\s*\(\s*)?optional/i.test(String(r)) ? 'ess-opt' : 'ess-impl';
+    const essK = LB.resultBadge;
     const resParts = (r) => { const m = String(r || '').match(/^([^:]+):\s*(.+)$/); return m ? [m[1].trim(), m[2].trim()] : [String(r || ''), '']; };
     const opt = (label, reading, result, adopted) => { const [lab, cond] = resParts(result); return `<div class="cp-opt${adopted ? ' cp-adopted' : ''}"><div class="cp-opt-h"><span>${label}</span>${adopted ? '<span class="cp-tick">adopted</span>' : ''}</div><p>${esc(reading)}</p><div class="cp-arrow">→ <span class="ess ${essK(lab)}">${esc(lab)}</span>${cond ? `<span class="cp-cond">${esc(cond)}</span>` : ''}</div></div>`; };
     const isDec = cp && decisive.has(String(c?.Claim_Feature?.Index ?? ''));
@@ -417,11 +425,11 @@ function buildHtmlV2(data, meta, restricted) {
     const excerptHtml = (x) => {
       const im = String(x.text).match(/^Image:\s*(https?:\/\/\S+)\s*$/m);
       const img = im ? `<a class="fig-img" href="${esc(im[1])}" target="_blank" rel="noopener"><img src="${esc(im[1])}" alt="${esc(x.heading || 'Figure')}" loading="lazy"></a>` : '';
-      return `<figure class="excerpt" id="f${esc(i)}-x${esc(x.num)}"><figcaption><span>Excerpt ${esc(x.num)}</span><span class="ref">${esc(x.ref)}</span></figcaption>${x.heading ? `<div class="exh">${esc(x.heading)}</div>` : ''}${img}<div class="ex-body">${excerptBodyHtml(x.text, exRanges[x.num] || [])}</div></figure>`;
+      return `<figure class="excerpt" id="f${esc(i)}-x${esc(x.num)}"><figcaption><span>Excerpt ${esc(x.num)}</span><span class="ref">${esc(x.ref)}</span></figcaption>${x.heading ? `<div class="exh">${esc(x.heading)}</div>` : ''}${img}<div class="ex-body">${excerptBodyHtml(x.text, exRanges[x.num] || [], LB.tables)}</div></figure>`;
     };
     const cited = ex.filter(x => citedNums.has(x.num)), other = ex.filter(x => !citedNums.has(x.num));
     const pb = dec.Practised_By || null;
-    const whoText = pb ? `Decoder: ${pb.decoder || ''} Encoder (${pb.encoder_case || ''}): ${pb.encoder || ''}` : '';
+    const whoText = LB.whoText(pb);
     const reasoning = [['Who practises it', whoText], ['Interpretation', an.Interpretation], ['Opinion', an.Overall_Opinion], ['Differences', an.Differences && !/^none\.?$/i.test(String(an.Differences).trim()) ? an.Differences : ''], ['Essentiality justification', dec.Justification]]
       .filter(([, v]) => v).map(([h, v]) => `<h4>${h}</h4><p>${esc(v)}</p>`).join('');
     const dcls = dec.Disclosure === 'Not Disclosed' ? 'b-red' : dec.Disclosure === 'Functionally Equivalent' ? 'b-amber' : 'b-green';
@@ -474,7 +482,7 @@ function buildHtmlV2(data, meta, restricted) {
 <h2>Summary mapping</h2>
 <p class="intro">One row per claim feature, in the claim's own words. The full analysis and evidence for each is in the detailed claim chart below.</p>
 <div class="tablewrap"><table class="align-t"><colgroup><col style="width:52px"><col style="width:29%"><col style="width:22%"><col style="width:15%"><col></colgroup><thead><tr><th scope="col">#</th><th scope="col">Claim feature</th><th scope="col">Maps to</th><th scope="col">Essentiality</th><th scope="col">Gap or caveat</th></tr></thead><tbody>${sumRows}</tbody></table></div>
-<div class="legend"><span><span class="ess ess-core">Core</span> required in every Main / Main 10 bitstream</span><span><span class="ess ess-opt">Optional</span> essential when an enabling flag is on</span><span><span class="badge b-amber">Verify</span> rests on a provision not in the cited excerpts</span></div>
+<div class="legend">${LB.legend.map(x => `<span><span class="ess ${esc(x.badge)}">${esc(x.label)}</span> ${esc(x.text)}</span>`).join('')}<span><span class="badge b-amber">Verify</span> rests on a provision not in the cited excerpts</span></div>
 
 <h2>Detailed claim chart</h2>
 <p class="intro">Each element of a feature has its own colour and number. The same colour and number mark the supporting text in the excerpts.</p>
