@@ -200,7 +200,7 @@ module.exports = function makeBuildDocumentV2(h) {
     }
     if (decisive.size && !oc) {
       panel.push(P(T(`The question${decisive.size > 1 ? "s" : ""} the verdict turns on (${decisive.size})`, { bold: true, size: 19, color: "8A5A00" }), { spacing: { before: 100, after: 40 } }));
-      for (const f of fr.filter(f => decisive.has(f.idx))) {
+      for (const f of fr.filter(f => decisive.has(f.idx) && f.cp)) {
         const p = plainDec[f.idx] || {};
         panel.push(P([T(`Feature ${f.idx}  `, { bold: true, size: 18 }), T(p.question || f.cp.question || `How should “${f.cp.claim_words}” be read?`, { size: 18 }), ...(f.cp.close_call === true ? [T("   (close call)", { size: 16, color: C.mid })] : [])], { spacing: { after: 20 } }));
         panel.push(P([T("If yes ", { bold: true, size: 17 }), T(`(this chart's reading): ${p.if_adopted || ("the claim is " + String(verdict.classification || "").toLowerCase())}    `, { size: 17, color: C.mid }),
