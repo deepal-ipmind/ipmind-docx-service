@@ -45,9 +45,12 @@ const arr = (x) => Array.isArray(x) ? x : (x == null ? [] : [x]);
 let katex = null;
 try { katex = require('katex'); } catch (e) { katex = null; }
 const unesc = (s) => String(s).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+// inside \text{…} KaTeX reads _ ^ # % & $ as math-only and fails (HEVC 2013: \text{bit_depth_luma_minus8}); escape them there
+const textSafe = (tex) => String(tex).replace(/\\(text(?:rm|it|bf|sf|tt)?|mathrm|operatorname)\{([^{}]*)\}/g,
+  (m, cmd, body) => `\\${cmd}{${body.replace(/(?<!\\)([_^#%&$])/g, '\\$1')}}`);
 function renderMath(tex, display) {
   if (!katex) return null;
-  try { return katex.renderToString(String(tex).trim(), { displayMode: display, output: 'mathml', throwOnError: true, strict: 'ignore' }); }
+  try { return katex.renderToString(textSafe(String(tex).trim()), { displayMode: display, output: 'mathml', throwOnError: true, strict: 'ignore' }); }
   catch (e) { return null; }
 }
 // typesets \[ … \] and \( … \) in already-escaped HTML, where no highlight mark falls inside the equation
