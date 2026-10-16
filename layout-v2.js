@@ -272,8 +272,8 @@ const BAND_NOTE = 'Evidence strength: High where most features are stated direct
 
 // the key's entries for HEVC v2.0 charts (HTML and Word); plain text, band words are bolded by the HTML layout
 const KEY_V3 = [
-  { label: 'How confidence is set', definition: "The headline gives the most likely outcome. Its confidence follows fixed criteria. High: nothing the result depends on is in genuine doubt. Every construction point the result depends on is settled, and no point in the standard is left to verify. Moderate: the result depends on a construction point on which one reading is clearly stronger but the other is reasonable; or a point in the standard is still to be verified; or a feature was found missing from part of a clause only; or the chart's reading of a point may conflict with another part of the claim. Toss-up: the result depends on a construction point on which both readings are reasonable, or on more than one point where one reading is only somewhat stronger. Either outcome is then reasonable, so the chart shows both, the one under which the claim maps first." },
-  { label: 'Alternative outcomes', definition: 'An outcome that holds if a construction point is decided the other way. Arguable: the other reading is reasonable. Weak: it is unlikely to be accepted; weak alternatives are not shown in the headline.' },
+  { label: 'How confidence is set', definition: "The headline gives the most likely outcome. Its confidence follows fixed criteria. High: nothing the result depends on is in genuine doubt: no construction point decides the result, and no point in the standard is left to verify. Moderate: the result turns on a construction point on which one reading is clearly stronger but the other is reasonable (the chart then shows the other outcome as arguable); or a point in the standard is still to be verified; or a feature was found missing from part of a clause only; or the chart's reading of a point may conflict with another part of the claim. Toss-up: the result depends on a construction point on which both readings are reasonable, or on more than one point where one reading is only somewhat stronger. Either outcome is then reasonable, so the chart shows both, the one under which the claim maps first." },
+  { label: 'Alternative outcomes', definition: 'An outcome that holds if a construction point is decided the other way. Arguable: the other reading is reasonable. Weak: the other reading would contradict another part of the claim; weak alternatives are not shown in the headline.' },
   { label: 'Construction points', definition: "Claim words that can reasonably be read in more than one way. Claims are read on their own wording, without the patent's description, which may settle a point. A difference in naming, or a rule that gives the same result in every case, is not a genuine construction point. A point is settled when only one reading is reasonable. The chart applies the stronger reading throughout and analyses the other reading as a complete alternative." },
   { label: 'In the standard?', definition: 'Whether the standard states the feature, the feature follows necessarily from what it states, it is met by an equivalent, or it is not found. Framing means wording such as a processor or memory that any implementation has.' },
   { label: 'For products', definition: 'Which products must practise the feature. A decoder must decode every bitstream of its profile, so a tool an encoder can switch off with an enabling flag is still core for decoders, while encoders use it only if they switch it on. Features that depend on an SEI message are optional for every product: only products that implement that message practise them.' },
@@ -322,9 +322,13 @@ function glanceV3(data) {
         : flagged ? `Only those that use ${toolText || 'the tools the claim relies on'}; an encoder may leave ${tools.length > 1 ? 'them' : 'it'} switched off.`
         : /PROFILE/.test(String(ml.kind)) ? 'Only encoders of the profiles that include this tool (not Main).'
         : `All. Every ${profile ? profile + ' ' : ''}encoder performs these steps.` });
+      else if (oc.encoder_route) who.push({ k: 'Encoders', t: 'Arguable. The claim is directed to decoding, but an encoder\'s internal reconstruction performs every claimed step; whether "decoding" covers it is a construction point. Even then, encoders do it in practice, not because the standard requires it.' });
       else {
-        // the analysis' own per-feature finding; "not required" means an encoder's reconstruction need not perform the step
-        const notMirrored = charts.filter(c => /^not required$/i.test(String(((c.Decision || {}).Practised_By || {}).encoder_case || ''))).map(c => String(c?.Claim_Feature?.Index ?? ''));
+        // the analysis' own per-feature finding: v3.4 records whether an encoder's reconstruction performs each step;
+        // older charts: "not required" means an encoder's reconstruction need not perform the step
+        const er = snap.encoder_reconstruction;
+        const notMirrored = er && er.recorded ? arr(er.not_performed).map(String)
+          : charts.filter(c => /^not required$/i.test(String(((c.Decision || {}).Practised_By || {}).encoder_case || ''))).map(c => String(c?.Claim_Feature?.Index ?? ''));
         const base = decodingClaim ? 'No. The claim is directed to decoding' : 'No. Encoders do not perform the claimed steps';
         who.push({ k: 'Encoders', t: notMirrored.length ? `${base}, and an encoder's internal reconstruction need not perform ${notMirrored.length > 1 ? 'features' : 'feature'} ${notMirrored.map(i => `${i} (${String(shortOf(i)).replace(/^./, ch => ch.toLowerCase())})`).join(', ')}.` : base + '.' });
       }
@@ -418,7 +422,7 @@ function buildHtmlV2(data, meta, restricted) {
   const nReaders = (q) => (votesOf(q).M || 0) + (votesOf(q).N || 0) + (votesOf(q).tie || 0);
   const statusWords = (q) => { const v = votesOf(q), a = Math.max(v.M || 0, v.N || 0), b = Math.min(v.M || 0, v.N || 0);
     if (q.dropped_by_sceptic) return { notation: 'a naming difference, not a dispute', case_by_case: 'the same result in every case, not a dispute', contradiction: 'the other reading contradicts the claim' }[q.dropped_by_sceptic] || 'not a genuine dispute';
-    if (q.status === 'agreed') return 'settled';
+    if (q.status === 'agreed') return q.decides ? 'one reading is clearly stronger' : 'settled';
     if (q.status === 'leans') return 'one reading is clearly stronger';
     if (q.status === 'split') return 'both readings are reasonable';
     return 'not assessed'; };
