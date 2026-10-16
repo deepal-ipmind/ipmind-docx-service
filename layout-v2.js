@@ -345,6 +345,8 @@ function glanceV3(data) {
   const eq = snap.evidence_quality || {};
   if (eq.partial_absence) change.push({ k: 'Evidence', t: 'A feature found missing was checked against part of a clause only.' });
   if (eq.lead_reanalysis_failed) change.push({ k: 'Evidence', t: 'The analysis under the adopted reading did not complete; the chart shows the first analysis.' });
+  // v2.0.1 (absence challenge): a step found missing that was not checked against what the standard does in other words
+  for (const u of arr(eq.untested_absences)) change.push({ k: 'Missing step', feature: String(u.feature), t: `"${u.claim_words}" was found missing; whether the standard does it in other words has not been checked.` });
   for (const q of q3) if (((q.contradicts || {})[q.leading] || 0) >= 2) change.push({ k: 'Construction point', t: `This chart's reading of “${q.claim_words}” may conflict with another part of the claim.` });
   const allMapped = feats.length && feats.every(f => ['Stated', 'Follows necessarily', 'Framing'].includes((f.answers || {}).in_standard));
   const nothing = change.length ? '' : (who.length && allMapped ? 'Nothing found. Every step is stated in the standard or follows necessarily from it.' : 'Nothing found that would change this outcome.');
