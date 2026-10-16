@@ -164,7 +164,7 @@ module.exports = function makeBuildDocumentV2(h) {
     const nReaders = (q) => ((q.votes || {}).M || 0) + ((q.votes || {}).N || 0) + ((q.votes || {}).tie || 0);
     const statusWords = (q) => { const v = q.votes || {}, a = Math.max(v.M || 0, v.N || 0), b = Math.min(v.M || 0, v.N || 0);
       if (q.dropped_by_sceptic) return { notation: "a naming difference, not a dispute", case_by_case: "the same result in every case, not a dispute", contradiction: "the other reading contradicts the claim" }[q.dropped_by_sceptic] || "not a genuine dispute";
-      if (q.status === "agreed") return "settled";
+      if (q.status === "agreed") return q.decides ? "one reading is clearly stronger" : "settled";
       if (q.status === "leans") return "one reading is clearly stronger";
       if (q.status === "split") return "both readings are reasonable";
       return "not assessed"; };
